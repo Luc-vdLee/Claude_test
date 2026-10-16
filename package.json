@@ -1,0 +1,12 @@
+{
+  "name": "figured-bass-decoder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Decode figured bass: chord, notes, Roman numeral and a SATB voicing.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "start": "python3 -m http.server 8000"
+  },
+  "license": "MIT"
+}
