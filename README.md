@@ -7,7 +7,12 @@ A small web app for realizing figured bass. Pick a key, a bass note and the figu
 - **the Roman numeral**, including secondary dominants (`V65/V`), the Neapolitan (`N6`) and augmented sixths (`It+6`, `Fr+6`, `Ger+6`)
 - **a four-part (SATB) voicing** that connects smoothly to the previous chord: no parallel 5ths or octaves, the leading tone rises, 7ths and suspensions resolve down. If you'd like something different, *Try another voicing* cycles through the next-best options.
 
-Every chord you add goes into the progression, which is drawn on a grand staff with figures and Roman numerals underneath. Note names can be shown in English (C♯, B♭, B), German (Cis, B, H) or Dutch (Cis, Bes, B).
+Every chord you add goes into the progression, which is drawn as a score on a grand staff with the figures and Roman numerals underneath:
+
+- **Note values**: eighth, quarter or half notes, plus rests in all voices. In a suspension (`4-3`) the bass holds while the upper voices move.
+- **Score settings**: time signature (2/4, 3/4, 4/4, 2/2, 3/8, 6/8 or custom), an optional pickup bar, and the starting key signature. Barlines are placed automatically, and notes that cross a barline are tied.
+- **Key changes**: when you change key partway through, you choose whether the score prints a new key signature (after a double barline) or keeps the old one with accidentals.
+- **Editing**: tap a chord in the score or the list to edit it, insert a chord before it, or delete it. The chords after it are re-voiced. Note names can be shown in English (C♯, B♭, B), German (Cis, B, H) or Dutch (Cis, Bes, B).
 
 **Live app:** https://luc-vdlee.github.io/Claude_test/
 
@@ -15,7 +20,8 @@ Every chord you add goes into the progression, which is drawn on a grand staff w
 
 | Input | Meaning |
 | --- | --- |
-| *(empty)*, `5`, `5/3` | root-position triad |
+| *(blank)* | unfigured bass: root-position triad, nothing printed |
+| `5`, `5/3` | root-position triad, with the figures printed |
 | `6`, `6/4` | first / second inversion |
 | `7`, `6/5`, `4/3`, `4/2` (or `2`) | seventh chord and its inversions |
 | `#`, `b`, `n` (♮) on their own | alter the 3rd above the bass |

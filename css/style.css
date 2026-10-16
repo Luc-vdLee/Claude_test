@@ -210,3 +210,33 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: 
 
 .settings[hidden] { display: none; }
 #names-choice button { flex: 1 1 auto; }
+
+/* Editing */
+.edit-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px;
+  padding: 8px 10px; margin-bottom: 16px; font-weight: 600;
+}
+.edit-banner[hidden] { display: none; }
+.actions { display: flex; gap: 8px; }
+.actions .primary { flex: 1; }
+.keysig-row { margin-top: 10px; font-size: .92rem; }
+.keysig-row[hidden] { display: none; }
+
+/* Note values */
+.note-icon { width: 20px; height: 22px; display: block; }
+#duration-choice button { min-width: 52px; display: flex; align-items: center; justify-content: center; }
+.toggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.blank-fig { font-family: var(--sans); font-size: .8rem; color: var(--muted); font-style: italic; }
+
+/* Score settings */
+.score-settings { margin-bottom: 12px; }
+.score-settings summary { cursor: pointer; color: var(--muted); font-size: .92rem; }
+.score-settings summary span { color: var(--ink); font-weight: 600; }
+.score-grid { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 10px; align-items: flex-end; }
+.field-inline { display: flex; flex-direction: column; }
+.field-inline[hidden] { display: none; }
+#time-num { width: 64px; font: inherit; color: inherit; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 8px; min-height: 40px; }
+.hint { color: var(--muted); font-size: .85rem; margin: 8px 0 0; }
+.insert-mark { color: var(--accent); font-weight: 700; align-self: center; }

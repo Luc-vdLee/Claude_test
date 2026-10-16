@@ -209,13 +209,14 @@ function describe(spec, midis, prev) {
 }
 
 /**
- * Voice a whole progression. `chords` is a list of decoded chords (from decode());
+ * Voice a whole progression. `chords` is a list of decoded chords (from decode()),
+ * or null for a rest (skipped: the next chord connects to the one before the rest);
  * `choices[i][stage]` picks an alternative (0 = best) for that stage.
  * Returns, per chord, a list of stage voicings.
  */
 export function voiceProgression(chords, choices = []) {
   let prev = null;
-  return chords.map((chord, ci) => chord.stages.map((stage, si) => {
+  return chords.map((chord, ci) => (chord ? chord.stages.map((stage, si) => {
     const spec = buildSpec(stage);
     const ranked = rankVoicings(spec, prev, null);
     if (ranked.length === 0) {
@@ -228,7 +229,7 @@ export function voiceProgression(chords, choices = []) {
     const result = { spec, midis, notes, issues: describe(spec, midis, prev), alternatives: ranked.length, choice, prevMidis: prev?.midis ?? null };
     prev = { spec, midis };
     return result;
-  }));
+  }) : null));
 }
 
 /** For each voice: tendency of the note it sings in this voicing, if any. */
