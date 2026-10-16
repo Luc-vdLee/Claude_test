@@ -134,16 +134,18 @@
 
     <section class="panel voice-panel" aria-label="Voice leading">
       <div class="panel-head">
-        <h2>Voice leading</h2>
+        <h2 id="vl-title">Voice leading</h2>
         <button id="next-voicing" class="ghost">Try another voicing ↻</button>
       </div>
       <div id="voice-leading"></div>
+      <div id="keyboard" class="keyboard-wrap"></div>
     </section>
 
     <section class="panel progression-panel" aria-label="Progression">
       <div class="panel-head">
         <h2>Progression</h2>
         <div class="row tight">
+          <button id="practice-toggle" class="toggle" aria-pressed="false" title="Write the upper voices yourself and check them">Practice</button>
           <button id="undo" class="ghost">Undo</button>
           <button id="clear-all" class="ghost danger">Clear</button>
         </div>

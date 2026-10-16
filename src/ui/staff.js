@@ -62,7 +62,9 @@ function beamTicks(timeSig) {
 
 function makeNote(VF, clef, piece, voice, color) {
   let sn;
-  if (piece.rest) {
+  if (piece.ghost) {
+    sn = new VF.GhostNote({ duration: piece.duration, dots: piece.dots });
+  } else if (piece.rest) {
     // One visible rest per staff; the other voice gets an invisible placeholder.
     if (voice === 0 || voice === 2) sn = new VF.GhostNote({ duration: piece.duration + 'r', dots: piece.dots });
     else sn = new VF.StaveNote({ clef, keys: [clef === 'treble' ? 'b/4' : 'd/3'], duration: piece.duration + 'r', dots: piece.dots });
@@ -81,7 +83,9 @@ function makeNote(VF, clef, piece, voice, color) {
  * @param {Array} data.bars           from layoutBars
  * @param {{num:number, den:number}} data.timeSig
  * @param {Array<{color?:string, stages:Array<{figures:string[], numeral:string}>}|null>} data.events
- * @param {(eventIndex:number)=>void} [data.onSelect]
+ * @param {(hit:{event:number, stage:number, clef?:string, diatonic?:number})=>void} [data.onSelect]
+ *        called on a click with the nearest chord step and, for clicks on a staff, the
+ *        clicked position as a diatonic step number (octave * 7 + letter).
  */
 export function renderScore(container, { bars, timeSig, events, onSelect, emptyKey }) {
   container.innerHTML = '';
@@ -117,6 +121,8 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
 
   const sequence = [[], [], [], []]; // per voice: { piece, sn, system }
   const hitboxes = [];
+  const stageHits = [];
+  const systemGeo = [];
   const beat = beamTicks(timeSig);
   const barLen = (timeSig.num * 16) / timeSig.den;
 
@@ -125,12 +131,17 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
     const labels = []; // figures/numerals, drawn once the line's lowest note is known
     let lowest = top + BASS_Y + 80;
     let x = 10;
+    let geoSet = false;
     system.bars.forEach((bi, k) => {
       const bar = bars[bi];
       const first = k === 0;
       const w = system.widths[k] + (first ? system.header : 0);
       const treble = new VF.Stave(x, top + TREBLE_Y, w);
       const bass = new VF.Stave(x, top + BASS_Y, w);
+      if (!geoSet) {
+        systemGeo.push({ y0: top, y1: top + SYSTEM_HEIGHT, trebleTop: treble.getYForLine(0), bassTop: bass.getYForLine(0), spacing: treble.getSpacingBetweenLines() });
+        geoSet = true;
+      }
       for (const [stave, clef] of [[treble, 'treble'], [bass, 'bass']]) {
         if (first) stave.addClef(clef).addKeySignature(bar.key);
         else if (bar.keyChanged) stave.addKeySignature(bar.key, bars[bi - 1].key);
@@ -184,7 +195,8 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
           if (idx >= 0) { sn = notes[v][idx]; break; }
         }
         const info = events[st.event]?.stages?.[st.stage];
-        if (sn && info) labels.push({ x: sn.getAbsoluteX() + 6, info, color: events[st.event].color });
+        if (sn && info) labels.push({ x: sn.getAbsoluteX() + 6, info, color: events[st.event].color, selected: info.selected, y: top });
+        if (sn) stageHits.push({ event: st.event, stage: st.stage, x: sn.getAbsoluteX() + 6, y0: top, y1: top + SYSTEM_HEIGHT });
       }
       for (const sn of notes[0]) {
         const bb = sn.getBoundingBox?.();
@@ -199,8 +211,17 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
     });
 
     const baseY = lowest + 20;
-    for (const { x: nx, info, color } of labels) {
+    for (const { x: nx, info, color, selected } of labels) {
       ctx.save();
+      if (selected) {
+        ctx.setFillStyle('#1d5fa8');
+        ctx.beginPath();
+        ctx.moveTo(nx - 7, top + 2);
+        ctx.lineTo(nx + 7, top + 2);
+        ctx.lineTo(nx, top + 12);
+        ctx.closePath();
+        ctx.fill();
+      }
       if (color) ctx.setFillStyle(color);
       ctx.setFont('Georgia', 14, '');
       info.figures.forEach((line, li) => {
@@ -238,14 +259,31 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
       const r = svg.getBoundingClientRect();
       const px = e.clientX - r.left;
       const py = e.clientY - r.top;
-      // Nearest chord on the clicked line.
-      let best = null;
-      for (const h of hitboxes) {
-        if (py < h.y0 || py > h.y1) continue;
-        const d = Math.abs(px - h.x);
-        if (d < 45 && (!best || d < best.d)) best = { d, event: h.event };
+      const nearest = (list) => {
+        let best = null;
+        for (const h of list) {
+          if (py < h.y0 || py > h.y1) continue;
+          const d = Math.abs(px - h.x);
+          if (d < 45 && (!best || d < best.d)) best = { d, h };
+        }
+        return best?.h ?? null;
+      };
+      const stage = nearest(stageHits);
+      if (!stage) {
+        const any = nearest(hitboxes);
+        if (any) onSelect({ event: any.event, stage: 0 });
+        return;
       }
-      if (best) onSelect(best.event);
+      const geo = systemGeo.find((g) => py >= g.y0 && py <= g.y1);
+      const half = geo.spacing / 2;
+      const trebleBottom = geo.trebleTop + 4 * geo.spacing;
+      const clef = py < (trebleBottom + geo.bassTop) / 2 ? 'treble' : 'bass';
+      const topLine = clef === 'treble' ? geo.trebleTop : geo.bassTop;
+      const topDiatonic = clef === 'treble' ? 5 * 7 + 3 : 3 * 7 + 5; // F5 / A3
+      const diatonic = topDiatonic - Math.round((py - topLine) / half);
+      // Clicks far outside the staves (e.g. on the figures) only select the chord.
+      const inRange = clef === 'treble' ? diatonic <= topDiatonic + 5 : diatonic >= topDiatonic - 8 - 6;
+      onSelect({ event: stage.event, stage: stage.stage, clef, diatonic: inRange ? diatonic : null });
     });
   }
 }

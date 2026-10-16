@@ -1,13 +1,14 @@
-import { LETTERS, noteName, pitchName, intervalName, parseNote, pc, midi, spellingKey, sameSpelling } from '../theory/pitch.js';
+import { LETTERS, noteName, pitchName, intervalName, parseNote, pc, midi, spellingKey, sameSpelling, spellOnLetter, withOctave } from '../theory/pitch.js';
 import { makeKey, KEY_TONICS, KEY_SIGNATURES, signatureAcc, signatureSpec, keyName } from '../theory/key.js';
 import { parseFigures, figureLines } from '../theory/figures.js';
 import { decode } from '../theory/decode.js';
 import { chordSymbolText, numeralText } from '../theory/chord.js';
-import { voiceProgression, tendenciesOf, VOICES } from '../theory/voicing.js';
+import { voiceProgression, tendenciesOf, checkVoicing, VOICES } from '../theory/voicing.js';
 import { parseLine, formatItem } from '../theory/line.js';
 import { suggestFigures } from '../theory/rule.js';
 import { buildVoices, layoutBars, barTicks, DURATION_TICKS, DURATION_NAMES } from '../theory/score.js';
 import { renderScore } from './staff.js';
+import { renderKeyboard, VOICE_COLORS } from './keyboard.js';
 
 const STORAGE_KEY = 'figured-bass-decoder:v1';
 const MAX_ALTERNATIVES = 8;
@@ -32,6 +33,7 @@ const defaults = () => ({
   target: { type: 'append' }, // or { type: 'edit' | 'insert', index }
   draft: null, // the new-chord inputs, kept while editing another chord
   suggestion: null, // explanation of the last suggested figures
+  practice: { on: false, voice: 3, sel: null, showSolution: false, checked: false },
   lineText: '',
   settings: { names: 'english', autoRaise: false },
   score: { timeSig: '4/4', customNum: 5, customDen: 4, pickup: 0, keySig: 'auto' },
@@ -45,7 +47,7 @@ function load() {
     if (!raw) return defaults();
     const saved = JSON.parse(raw);
     const d = defaults();
-    const s = { ...d, ...saved, settings: { ...d.settings, ...saved.settings }, score: { ...d.score, ...saved.score } };
+    const s = { ...d, ...saved, settings: { ...d.settings, ...saved.settings }, score: { ...d.score, ...saved.score }, practice: { ...d.practice, ...saved.practice } };
     if (s.target?.type !== 'append' && !(s.target?.index < s.progression.length + (s.target?.type === 'insert' ? 1 : 0))) s.target = d.target;
     return s;
   } catch {
@@ -113,15 +115,131 @@ function compute() {
   const entries = [...state.progression];
   const t = state.target;
   let focus = null;
-  if (inputValid) {
+  const practicing = state.practice.on && t.type === 'append';
+  if (practicing) {
+    focus = state.practice.sel && state.practice.sel.event < entries.length ? state.practice.sel.event : null;
+  } else if (inputValid) {
     if (t.type === 'edit') { entries[t.index] = input; focus = t.index; }
     else if (t.type === 'insert') { entries.splice(t.index, 0, input); focus = t.index; }
     else { entries.push(input); focus = entries.length - 1; }
   }
-  const decoded = entries.map((e, i) => (i === focus ? inputDecoded : decodeEntry(e)));
+  const decoded = entries.map((e, i) => (i === focus && !practicing ? inputDecoded : decodeEntry(e)));
   const fixedBass = entries.map((e) => (e.rest || e.bassOctave == null ? null : midi({ ...e.bass, octave: e.bassOctave })));
   const voiced = voiceProgression(decoded, entries.map((e) => e.choice ?? []), fixedBass);
-  return { entries, decoded, voiced, focus, input, inputDecoded, inputValid };
+  const model = { entries, decoded, voiced, focus, input, inputDecoded, inputValid, practicing };
+  if (state.practice.on) model.practice = practiceResults(model);
+  return model;
+}
+
+// ---------------------------------------------------------------- practice
+
+const userNotes = (entry, stage) => entry.user?.[stage] ?? [null, null, null, null];
+
+/** Check every chord step the user has fully written. */
+function practiceResults(model) {
+  const steps = [];
+  let prev = null;
+  model.entries.forEach((e, i) => {
+    if (e.rest || !model.voiced[i]) return;
+    model.voiced[i].forEach((v, si) => {
+      const user = userNotes(e, si);
+      const bass = v.notes?.[0];
+      const complete = !!bass && user.slice(1).every(Boolean);
+      let result = null;
+      if (complete) {
+        const notes = [bass, user[1], user[2], user[3]];
+        result = checkVoicing(v.spec, notes, prev);
+        prev = result.valid ? { spec: v.spec, midis: notes.map(midi) } : null;
+      } else {
+        prev = null;
+      }
+      steps.push({ event: i, stage: si, complete, result, bass, user });
+    });
+  });
+  return steps;
+}
+
+function stepStatus(step) {
+  if (!step?.complete) return 'incomplete';
+  if (step.result.issues.some((x) => x.level === 'error')) return 'error';
+  if (step.result.issues.some((x) => x.level === 'warn')) return 'warn';
+  return 'ok';
+}
+
+const STATUS_COLOR = { ok: '#2f7d3a', warn: '#a66a00', error: '#b3261e' };
+
+/** Spell a key press: as a chord tone if possible, else by the key signature, else with a sharp. */
+function spellMidi(m, spec, key) {
+  const pcm = ((m % 12) + 12) % 12;
+  const tone = spec?.find((e) => e.pc === pcm);
+  if (tone) return withOctave(tone.note, m);
+  for (let l = 0; l < 7; l++) {
+    const n = { letter: l, acc: signatureAcc(key, l) };
+    if (pc(n) === pcm) return withOctave(n, m);
+  }
+  const natural = [0, 2, 4, 5, 7, 9, 11].filter((x) => x <= pcm).length - 1;
+  return withOctave(spellOnLetter(natural, pcm), m);
+}
+
+function stepsOrder(model) {
+  return model.practice.map((s) => ({ event: s.event, stage: s.stage }));
+}
+
+function advance(model) {
+  const p = state.practice;
+  if (p.voice > 1) { p.voice -= 1; return; }
+  const order = stepsOrder(model);
+  const i = order.findIndex((s) => s.event === p.sel.event && s.stage === p.sel.stage);
+  if (i >= 0 && i < order.length - 1) p.sel = order[i + 1];
+  p.voice = 3;
+}
+
+function setUserNote(event, stage, voice, note) {
+  const e = state.progression[event];
+  if (!e || e.rest) return;
+  const stages = model0().voiced[event]?.length ?? 1;
+  e.user = Array.from({ length: stages }, (_, si) => [...(e.user?.[si] ?? [null, null, null, null])]);
+  e.user[stage][voice] = note;
+}
+
+const model0 = () => compute();
+
+function placeFromStaff(hit) {
+  const e = state.progression[hit.event];
+  if (!e || e.rest) return;
+  state.practice.sel = { event: hit.event, stage: hit.stage };
+  if (hit.diatonic != null) {
+    const model = compute();
+    const spec = model.voiced[hit.event]?.[hit.stage]?.spec;
+    const letter = ((hit.diatonic % 7) + 7) % 7;
+    const octave = Math.floor(hit.diatonic / 7);
+    const tone = spec?.find((x) => x.note.letter === letter);
+    const acc = tone ? tone.note.acc : signatureAcc(entryKey(e), letter);
+    setUserNote(hit.event, hit.stage, state.practice.voice, { letter, acc, octave });
+    advance(compute());
+  }
+  update();
+}
+
+function placeFromKey(m) {
+  const sel = state.practice.sel;
+  if (!sel) return;
+  const e = state.progression[sel.event];
+  const model = compute();
+  const spec = model.voiced[sel.event]?.[sel.stage]?.spec;
+  setUserNote(sel.event, sel.stage, state.practice.voice, spellMidi(m, spec, entryKey(e)));
+  advance(compute());
+  update();
+}
+
+function changeSelectedNote(fn) {
+  const sel = state.practice.sel;
+  if (!sel) return;
+  const e = state.progression[sel.event];
+  const note = userNotes(e, sel.stage)[state.practice.voice];
+  if (!note) return;
+  setUserNote(sel.event, sel.stage, state.practice.voice, fn(note, e));
+  update();
 }
 
 /** Key in force just before position `index` of the stored progression. */
@@ -267,11 +385,13 @@ function renderResult(model) {
   const el = $('result');
   $('add-chord').disabled = !model.inputValid;
   if (model.focus === null) {
-    el.innerHTML = `<p class="error-text">${esc(model.inputDecoded?.error ?? '')}</p>`;
+    el.innerHTML = model.practicing
+      ? '<p class="empty">Practice mode: tap a chord in the score to work on it. Its chord information appears here.</p>'
+      : `<p class="error-text">${esc(model.inputDecoded?.error ?? '')}</p>`;
     return;
   }
   const entry = model.entries[model.focus];
-  const position = state.target.type === 'append' ? '' : `Chord ${model.focus + 1} · `;
+  const position = state.target.type === 'append' && !model.practicing ? '' : `Chord ${model.focus + 1} · `;
   if (entry.rest) {
     el.innerHTML = `
       <div class="result-eyebrow">${position}${esc(DURATION_NAMES[durationOf(entry)])} rest</div>
@@ -332,6 +452,13 @@ function renderVoiceLeading(model) {
   const el = $('voice-leading');
   const btn = $('next-voicing');
   const idx = model.focus;
+  $('vl-title').textContent = model.practicing ? 'Practice: write the upper voices' : 'Voice leading';
+  btn.hidden = model.practicing;
+  if (model.practicing) {
+    renderPractice(model);
+    return;
+  }
+  renderKeyboardFor(model);
   if (idx === null) {
     el.innerHTML = '<p class="empty">Fix the figures to see a voicing.</p>';
     btn.disabled = true;
@@ -389,12 +516,113 @@ function renderVoiceLeading(model) {
     <p class="vl-meta">${meta}</p>`;
 }
 
+function renderKeyboardFor(model) {
+  const idx = model.focus;
+  const stages = idx !== null ? model.voiced[idx] : null;
+  const cur = stages?.[stages.length - 1];
+  let prevIdx = idx === null ? -1 : idx - 1;
+  while (prevIdx >= 0 && !model.voiced[prevIdx]) prevIdx--;
+  const prevChord = prevIdx >= 0 ? model.voiced[prevIdx] : null;
+  renderKeyboard($('keyboard'), {
+    current: cur?.midis ?? [],
+    previous: prevChord?.[prevChord.length - 1]?.midis ?? [],
+  });
+}
+
+function renderPractice(model) {
+  const el = $('voice-leading');
+  const p = state.practice;
+  const steps = model.practice;
+  const sel = p.sel ? steps.find((s) => s.event === p.sel.event && s.stage === p.sel.stage) : null;
+  const solution = sel ? model.voiced[sel.event][sel.stage] : null;
+  const prevStep = sel ? steps[steps.indexOf(sel) - 1] : null;
+
+  const voiceButtons = [3, 2, 1].map((v) => `<button data-voice="${v}" role="radio" aria-checked="${p.voice === v}"><span class="dot" style="background:${VOICE_COLORS[v]}"></span>${VOICES[v]}</button>`).join('');
+  let table = '<p class="empty">Tap a chord in the score to select it. Then tap the staff (or the keyboard) to place a note for the chosen voice.</p>';
+  if (sel) {
+    const rows = [3, 2, 1, 0].map((v) => {
+      const mine = v === 0 ? sel.bass : sel.user[v];
+      const sol = solution?.notes?.[v];
+      return `<tr class="${p.voice === v ? 'active' : ''}"><th scope="row"><span class="dot" style="background:${VOICE_COLORS[v]}"></span>${VOICES[v]}</th>
+        <td class="p">${mine ? esc(pitchName(mine, sys())) : '<span class="empty">—</span>'}</td>
+        ${p.showSolution ? `<td class="p">${sol ? esc(pitchName(sol, sys())) : '—'}</td>` : ''}</tr>`;
+    }).join('');
+    const label = `Chord ${sel.event + 1}${model.voiced[sel.event].length > 1 ? `, step ${sel.stage + 1}` : ''} · ${esc(shortNumeral(model.decoded[sel.event]))}`;
+    table = `<div class="practice-sel">${label}</div>
+      <table class="vl-table"><thead><tr><th>Voice</th><th>Yours</th>${p.showSolution ? '<th>Solution</th>' : ''}</tr></thead><tbody>${rows}</tbody></table>`;
+    if (p.checked && sel.complete) {
+      const issues = sel.result.issues;
+      table += issues.length
+        ? `<div class="callouts">${issues.map((i) => `<div class="callout ${i.level === 'error' ? 'error' : i.level === 'warn' ? 'warn' : ''}">${esc(i.text)}</div>`).join('')}</div>`
+        : '<div class="callouts"><div class="callout ok">✓ No problems found in this chord.</div></div>';
+    } else if (p.checked) {
+      table += '<div class="callouts"><div class="callout">Fill in soprano, alto and tenor to check this chord.</div></div>';
+    }
+  }
+
+  let summary = '';
+  if (p.checked) {
+    const complete = steps.filter((s) => s.complete);
+    const bad = complete.filter((s) => stepStatus(s) === 'error');
+    const warn = complete.filter((s) => stepStatus(s) === 'warn');
+    summary = `<div class="practice-summary">
+      <strong>${complete.length} of ${steps.length}</strong> chord steps written ·
+      <span class="ok-text">${complete.length - bad.length - warn.length} ✓</span> ·
+      <span class="warn-text">${warn.length} with warnings</span> ·
+      <span class="error-text">${bad.length} with errors</span>
+      ${[...bad, ...warn].length ? `<div class="problem-list">${[...bad, ...warn].map((s) => `<button class="ghost" data-goto="${s.event}:${s.stage}">Chord ${s.event + 1}${model.voiced[s.event].length > 1 ? '.' + (s.stage + 1) : ''}</button>`).join('')}</div>` : ''}
+    </div>`;
+  }
+
+  el.innerHTML = `
+    <div class="practice-tools">
+      <div class="segmented" id="practice-voice" role="radiogroup" aria-label="Voice to write">${voiceButtons}</div>
+      <div class="segmented small" id="practice-acc" aria-label="Accidental for the selected note">
+        <button data-acc="-1" title="Flat">♭</button><button data-acc="0" title="Natural">♮</button><button data-acc="1" title="Sharp">♯</button>
+      </div>
+      <button id="practice-clear" class="ghost" ${sel ? '' : 'disabled'}>Clear chord</button>
+    </div>
+    ${table}
+    <div class="row practice-actions">
+      <button id="practice-check" class="${p.checked ? 'toggle' : 'ghost strong'}" aria-pressed="${p.checked}">${p.checked ? 'Checking ✓' : 'Check my voices'}</button>
+      <button id="practice-solution" class="toggle" aria-pressed="${p.showSolution}">Show solution</button>
+    </div>
+    ${summary}
+    <p class="vl-meta">Tip: ↑/↓ move the selected voice's note by a step.</p>`;
+
+  renderKeyboard($('keyboard'), {
+    current: sel ? [sel.bass, ...sel.user.slice(1)].map((n) => (n ? midi(n) : null)) : [],
+    previous: prevStep ? [prevStep.bass, ...prevStep.user.slice(1)].map((n) => (n ? midi(n) : null)) : [],
+    onKey: sel ? placeFromKey : undefined,
+  });
+}
+
 function renderProgression(model) {
   const { entries, decoded, voiced, focus } = model;
-  const color = (i) => (i === focus ? (state.target.type === 'edit' ? EDIT_COLOR : PREVIEW_COLOR) : undefined);
+  const practice = state.practice.on && model.practicing;
+  const showUser = practice && !state.practice.showSolution;
+  const statusOf = (i) => {
+    const steps = model.practice.filter((s) => s.event === i);
+    if (!steps.length || steps.some((s) => !s.complete)) return null;
+    const order = ['ok', 'warn', 'error'];
+    return steps.map(stepStatus).reduce((a, b) => (order.indexOf(b) > order.indexOf(a) ? b : a), 'ok');
+  };
+  const color = (i) => {
+    if (practice) return state.practice.checked && showUser ? STATUS_COLOR[statusOf(i)] : undefined;
+    return i === focus ? (state.target.type === 'edit' ? EDIT_COLOR : PREVIEW_COLOR) : undefined;
+  };
 
-  // Score
-  const events = entries.map((e, i) => ({ ticks: DURATION_TICKS[durationOf(e)], rest: !!e.rest, stages: voiced[i] }));
+  // Score (in practice mode: the bass plus the user's own upper voices)
+  const stagesFor = (e, i) => {
+    if (!showUser || !voiced[i]) return voiced[i];
+    return voiced[i].map((v, si) => {
+      if (!v.notes) return v;
+      const user = userNotes(e, si);
+      const notes = [v.notes[0], user[1], user[2], user[3]];
+      return { ...v, notes, midis: notes.map((n) => (n ? midi(n) : null)) };
+    });
+  };
+  const events = entries.map((e, i) => ({ ticks: DURATION_TICKS[durationOf(e)], rest: !!e.rest, stages: stagesFor(e, i) }));
   const built = buildVoices(events);
   const firstKey = entries[0] ? entryKey(entries[0]) : currentKey();
   const initialKey = state.score.keySig === 'auto' ? signatureSpec(firstKey) : state.score.keySig;
@@ -410,6 +638,7 @@ function renderProgression(model) {
     stages: e.rest ? [] : decoded[i].stages.map((_, si) => ({
       figures: decoded[i].written[si] ?? [],
       numeral: si === 0 ? shortNumeral(decoded[i]) : '',
+      selected: practice && state.practice.sel?.event === i && state.practice.sel?.stage === si,
     })),
   }));
   renderScore($('staff'), {
@@ -417,7 +646,7 @@ function renderProgression(model) {
     timeSig: timeSig(),
     events: info,
     emptyKey: initialKey,
-    onSelect: (i) => selectEvent(i),
+    onSelect: (hit) => (practice ? placeFromStaff(hit) : selectEvent(hit.event)),
   });
 
   // History list (the stored progression; the input is shown at its position)
@@ -439,11 +668,12 @@ function renderProgression(model) {
 
   $('undo').disabled = state.progression.length === 0;
   $('clear-all').disabled = state.progression.length === 0;
+  $('practice-toggle').setAttribute('aria-pressed', String(state.practice.on));
 }
 
 /** The bass note the focused chord is actually voiced with (for the octave controls). */
 function focusBass(model) {
-  if (model.focus === null || state.rest) return null;
+  if (model.focus === null || state.rest || model.practicing) return null;
   return model.voiced[model.focus]?.[0]?.notes?.[0] ?? null;
 }
 
@@ -593,7 +823,7 @@ function commit() {
   if (!inputValid) return;
   const entry = inputEntry();
   const t = state.target;
-  if (t.type === 'edit') state.progression[t.index] = entry;
+  if (t.type === 'edit') state.progression[t.index] = { ...entry, user: state.progression[t.index].user };
   else if (t.type === 'insert') state.progression.splice(t.index, 0, entry);
   else state.progression.push(entry);
 
@@ -669,6 +899,35 @@ function bind() {
     setInput({ figures, rest: false, suggestion: `Suggested: ${figures || 'blank (5/3)'}. ${reason}` });
   });
 
+  $('practice-toggle').addEventListener('click', () => {
+    state.practice.on = !state.practice.on;
+    if (state.practice.on) {
+      backToAppend();
+      const first = compute().practice[0];
+      if (!state.practice.sel && first) state.practice.sel = { event: first.event, stage: first.stage };
+    }
+    update();
+  });
+  $('voice-leading').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;
+    const p = state.practice;
+    if (b.dataset.voice) { p.voice = Number(b.dataset.voice); update(); }
+    else if (b.dataset.acc !== undefined) changeSelectedNote((n) => ({ ...n, acc: Number(b.dataset.acc) }));
+    else if (b.id === 'practice-clear' && p.sel) {
+      const entry = state.progression[p.sel.event];
+      if (entry.user?.[p.sel.stage]) entry.user[p.sel.stage] = [null, null, null, null];
+      p.voice = 3;
+      update();
+    } else if (b.id === 'practice-check') { p.checked = !p.checked; update(); }
+    else if (b.id === 'practice-solution') { p.showSolution = !p.showSolution; update(); }
+    else if (b.dataset.goto) {
+      const [event, stage] = b.dataset.goto.split(':').map(Number);
+      p.sel = { event, stage };
+      update();
+    }
+  });
+
   $('line-text').addEventListener('input', (e) => { state.lineText = e.target.value; save(); renderLine(); });
   $('line-add').addEventListener('click', addLine);
   $('line-suggest').addEventListener('click', suggestLine);
@@ -729,6 +988,18 @@ function bind() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && state.target.type !== 'append') { cancelEdit(); return; }
     if (e.target.closest('input, select, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (state.practice.on && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && state.practice.sel) {
+      e.preventDefault();
+      const step = e.key === 'ArrowUp' ? 1 : -1;
+      changeSelectedNote((n, entry) => {
+        const d = n.octave * 7 + n.letter + step;
+        const letter = ((d % 7) + 7) % 7;
+        const spec = compute().voiced[state.practice.sel.event]?.[state.practice.sel.stage]?.spec;
+        const tone = spec?.find((x) => x.note.letter === letter);
+        return { letter, acc: tone ? tone.note.acc : signatureAcc(entryKey(entry), letter), octave: Math.floor(d / 7) };
+      });
+      return;
+    }
     const i = 'cdefgab'.indexOf(e.key.toLowerCase());
     if (i >= 0 && e.key.length === 1 && !state.rest) {
       setInput({ bassLetter: i, bassAcc: 'key' });

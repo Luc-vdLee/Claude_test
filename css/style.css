@@ -263,3 +263,22 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .line-error { color: var(--bad); font-size: .85rem; width: 100%; }
 .strong { font-weight: 600; border-color: var(--accent); }
 .line-help { padding-left: 18px; }
+
+/* Keyboard */
+.keyboard-wrap { margin-top: 14px; overflow-x: auto; }
+.keyboard { display: block; width: 100%; min-width: 520px; height: auto; }
+
+/* Practice */
+.practice-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.practice-tools .segmented.small { margin-top: 0; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.practice-sel { font-weight: 600; margin-bottom: 4px; }
+.vl-table tr.active th, .vl-table tr.active td { background: var(--accent-soft); }
+.practice-actions { margin-top: 12px; }
+.practice-summary { margin-top: 12px; font-size: .92rem; }
+.problem-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.problem-list button { min-height: 32px; padding: 4px 10px; }
+.callout.ok { background: color-mix(in srgb, var(--good) 14%, transparent); }
+.ok-text { color: var(--good); }
+.warn-text { color: var(--warn); }
+body.practicing .input-panel .primary { opacity: .9; }

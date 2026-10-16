@@ -15,6 +15,8 @@ Every chord you add goes into the progression, which is drawn as a score on a gr
 - **Bass octave**: the app picks the octave closest to the previous bass; ↓ 8va / ↑ 8va fix it an octave lower or higher, *Auto* goes back.
 - **Type a whole bass line** at once, e.g. `C  D:6/4/3  E:6  F#3/8:6/5  G/h:6/4-5/3  r  C/h` (octave, `/8 /q /h` note value, figures after `:`, `r` for a rest).
 - **Suggest figures** for a bass note, or for all blank notes in a typed line, with the Rule of the Octave (rising and falling, major and minor).
+- **Piano keyboard**: the current voicing is shown on a keyboard, colored by voice, with the previous chord as faint outlines.
+- **Practice mode**: write the soprano, alto and tenor yourself (tap the staff or the keyboard; ♭ ♮ ♯ and ↑/↓ adjust the note), then *Check my voices*: wrong notes, spelling, missing chord members, doubling, crossing, spacing, parallels and unresolved tendency tones are marked per chord. *Show solution* shows the app's voicing.
 - **Editing**: tap a chord in the score or the list to edit it, insert a chord before it, or delete it. The chords after it are re-voiced. Note names can be shown in English (C♯, B♭, B), German (Cis, B, H) or Dutch (Cis, Bes, B).
 
 **Live app:** https://luc-vdlee.github.io/Claude_test/
