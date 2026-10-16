@@ -240,3 +240,26 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 #time-num { width: 64px; font: inherit; color: inherit; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 8px; min-height: 40px; }
 .hint { color: var(--muted); font-size: .85rem; margin: 8px 0 0; }
 .insert-mark { color: var(--accent); font-weight: 700; align-self: center; }
+
+/* Bass octave */
+.bass-row { margin-top: 8px; justify-content: space-between; }
+.bass-row .segmented.small { margin-top: 0; }
+.octave-ctl { display: inline-flex; align-items: center; gap: 4px; }
+.octave-ctl button { min-height: 38px; padding: 6px 8px; font-size: .9rem; }
+.octave-label { font-family: var(--serif); font-size: 1.05rem; min-width: 64px; text-align: center; }
+.octave-label small { display: block; font-family: var(--sans); font-size: .68rem; color: var(--muted); }
+
+/* Typed bass line */
+.line-entry { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+.line-entry summary { cursor: pointer; font-weight: 600; }
+.line-entry textarea {
+  width: 100%; margin: 10px 0 8px; font: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .95rem;
+  color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; resize: vertical;
+}
+.line-preview { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.line-chip { border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; font-size: .85rem; background: var(--bg); }
+.line-chip b { font-family: var(--serif); color: var(--accent); }
+.line-chip.bad { border-color: var(--bad); background: var(--bad-soft); }
+.line-error { color: var(--bad); font-size: .85rem; width: 100%; }
+.strong { font-weight: 600; border-color: var(--accent); }
+.line-help { padding-left: 18px; }

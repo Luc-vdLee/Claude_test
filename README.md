@@ -12,6 +12,9 @@ Every chord you add goes into the progression, which is drawn as a score on a gr
 - **Note values**: eighth, quarter or half notes, plus rests in all voices. In a suspension (`4-3`) the bass holds while the upper voices move.
 - **Score settings**: time signature (2/4, 3/4, 4/4, 2/2, 3/8, 6/8 or custom), an optional pickup bar, and the starting key signature. Barlines are placed automatically, and notes that cross a barline are tied.
 - **Key changes**: when you change key partway through, you choose whether the score prints a new key signature (after a double barline) or keeps the old one with accidentals.
+- **Bass octave**: the app picks the octave closest to the previous bass; ↓ 8va / ↑ 8va fix it an octave lower or higher, *Auto* goes back.
+- **Type a whole bass line** at once, e.g. `C  D:6/4/3  E:6  F#3/8:6/5  G/h:6/4-5/3  r  C/h` (octave, `/8 /q /h` note value, figures after `:`, `r` for a rest).
+- **Suggest figures** for a bass note, or for all blank notes in a typed line, with the Rule of the Octave (rising and falling, major and minor).
 - **Editing**: tap a chord in the score or the list to edit it, insert a chord before it, or delete it. The chords after it are re-voiced. Note names can be shown in English (C♯, B♭, B), German (Cis, B, H) or Dutch (Cis, Bes, B).
 
 **Live app:** https://luc-vdlee.github.io/Claude_test/

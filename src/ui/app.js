@@ -1,9 +1,11 @@
-import { LETTERS, noteName, pitchName, intervalName, parseNote, pc, spellingKey, sameSpelling } from '../theory/pitch.js';
+import { LETTERS, noteName, pitchName, intervalName, parseNote, pc, midi, spellingKey, sameSpelling } from '../theory/pitch.js';
 import { makeKey, KEY_TONICS, KEY_SIGNATURES, signatureAcc, signatureSpec, keyName } from '../theory/key.js';
 import { parseFigures, figureLines } from '../theory/figures.js';
 import { decode } from '../theory/decode.js';
 import { chordSymbolText, numeralText } from '../theory/chord.js';
 import { voiceProgression, tendenciesOf, VOICES } from '../theory/voicing.js';
+import { parseLine, formatItem } from '../theory/line.js';
+import { suggestFigures } from '../theory/rule.js';
 import { buildVoices, layoutBars, barTicks, DURATION_TICKS, DURATION_NAMES } from '../theory/score.js';
 import { renderScore } from './staff.js';
 
@@ -13,13 +15,14 @@ const PREVIEW_COLOR = '#b0601e';
 const EDIT_COLOR = '#1d5fa8';
 
 const FIGURE_BUTTONS = ['', '5/3', '6', '6/4', '7', '6/5', '4/3', '4/2', '#', 'b', 'n', '7 #', '#6', '4-3', '9-8', '7-6', '6/4-5/3'];
-const INPUT_FIELDS = ['tonic', 'mode', 'bassLetter', 'bassAcc', 'figures', 'duration', 'rest', 'newKeySig'];
+const INPUT_FIELDS = ['tonic', 'mode', 'bassLetter', 'bassAcc', 'bassOctave', 'figures', 'duration', 'rest', 'newKeySig'];
 
 const defaults = () => ({
   tonic: 'C',
   mode: 'major',
   bassLetter: 0,
   bassAcc: 'key',
+  bassOctave: null, // null = chosen automatically
   figures: '',
   duration: 'q',
   rest: false,
@@ -28,6 +31,8 @@ const defaults = () => ({
   progression: [],
   target: { type: 'append' }, // or { type: 'edit' | 'insert', index }
   draft: null, // the new-chord inputs, kept while editing another chord
+  suggestion: null, // explanation of the last suggested figures
+  lineText: '',
   settings: { names: 'english', autoRaise: false },
   score: { timeSig: '4/4', customNum: 5, customDen: 4, pickup: 0, keySig: 'auto' },
 });
@@ -77,6 +82,7 @@ function inputEntry() {
     tonic: state.tonic,
     mode: state.mode,
     bass: currentBass(),
+    bassOctave: state.bassOctave,
     figures: state.figures.trim(),
     duration: state.duration,
     rest: state.rest,
@@ -113,7 +119,8 @@ function compute() {
     else { entries.push(input); focus = entries.length - 1; }
   }
   const decoded = entries.map((e, i) => (i === focus ? inputDecoded : decodeEntry(e)));
-  const voiced = voiceProgression(decoded, entries.map((e) => e.choice ?? []));
+  const fixedBass = entries.map((e) => (e.rest || e.bassOctave == null ? null : midi({ ...e.bass, octave: e.bassOctave })));
+  const voiced = voiceProgression(decoded, entries.map((e) => e.choice ?? []), fixedBass);
   return { entries, decoded, voiced, focus, input, inputDecoded, inputValid };
 }
 
@@ -307,6 +314,7 @@ function renderResult(model) {
 
   const remarks = [...new Set(chord.stages.flatMap((s) => s.analysis.notes))];
   const callouts = [
+    ...(state.suggestion && model.focus === targetIndex() ? [`<div class="callout">${esc(state.suggestion)}</div>`] : []),
     ...chord.hints.map((h) => `<div class="callout warn">${esc(h)}</div>`),
     ...remarks.map((r) => `<div class="callout">${esc(r)}</div>`),
   ].join('');
@@ -422,7 +430,7 @@ function renderProgression(model) {
     } else {
       const chord = decodeEntry(e);
       const sym = chordSymbolText(chord.main, sys());
-      body = `<span class="h-num">${esc(chord.label)}</span><span class="h-sub">${esc(sym || '')} · ${esc(nn(e.bass))} ${esc(e.figures || 'blank')} · ${DURATION_SYMBOL[durationOf(e)]}</span>`;
+      body = `<span class="h-num">${esc(chord.label)}</span><span class="h-sub">${esc(sym || '')} · ${esc(nn(e.bass))}${e.bassOctave ?? ""} ${esc(e.figures || "blank")} · ${DURATION_SYMBOL[durationOf(e)]}</span>`;
     }
     const insertMark = state.target.type === 'insert' && state.target.index === i ? '<li class="insert-mark" aria-label="Insert position">▸</li>' : '';
     return `${insertMark}<li><button data-index="${i}" aria-pressed="${pressed}"><span class="idx">${i + 1}${e.newKeySig && i > 0 ? ' 🔑' : ''}</span>${body}</button></li>`;
@@ -433,10 +441,98 @@ function renderProgression(model) {
   $('clear-all').disabled = state.progression.length === 0;
 }
 
+/** The bass note the focused chord is actually voiced with (for the octave controls). */
+function focusBass(model) {
+  if (model.focus === null || state.rest) return null;
+  return model.voiced[model.focus]?.[0]?.notes?.[0] ?? null;
+}
+
+function renderOctave(model) {
+  const bass = focusBass(model);
+  $('octave-label').innerHTML = bass
+    ? `${esc(pitchName(bass, sys()))}<small>${state.bassOctave == null ? 'auto' : 'fixed'}</small>`
+    : '—';
+  $('octave-down').disabled = !bass || bass.octave <= 1;
+  $('octave-up').disabled = !bass || bass.octave >= 5;
+  $('octave-auto').disabled = state.bassOctave == null;
+}
+
+/** Bass notes around the input position, for suggesting figures. */
+function neighbours() {
+  const i = targetIndex();
+  const list = state.progression;
+  const before = list.slice(0, i).reverse().find((e) => !e.rest);
+  const afterStart = state.target.type === 'edit' ? i + 1 : i;
+  const after = list.slice(afterStart).find((e) => !e.rest);
+  return { prev: before?.bass, next: after?.bass };
+}
+
+function lineEntries() {
+  const key = currentKey();
+  return parseLine(state.lineText).map((item) => {
+    if (item.error) return { item };
+    if (item.rest) return { item, entry: { tonic: state.tonic, mode: state.mode, rest: true, duration: item.duration ?? state.duration, bass: currentBass(), figures: '', choice: [] } };
+    const bass = { letter: item.letter, acc: item.acc ?? signatureAcc(key, item.letter) };
+    return {
+      item,
+      entry: { tonic: state.tonic, mode: state.mode, bass, bassOctave: item.octave, figures: item.figures, duration: item.duration ?? state.duration, rest: false, newKeySig: false, choice: [] },
+    };
+  });
+}
+
+function renderLine() {
+  const ta = $('line-text');
+  if (ta.value !== state.lineText) ta.value = state.lineText;
+  const rows = lineEntries();
+  const errors = rows.filter((r) => r.item.error);
+  $('line-preview').innerHTML = rows.map(({ item, entry }) => {
+    if (item.error) return `<span class="line-chip bad">${esc(item.raw)}</span>`;
+    if (entry.rest) return `<span class="line-chip">rest ${DURATION_SYMBOL[entry.duration]}</span>`;
+    const d = decodeEntry(entry);
+    return `<span class="line-chip">${esc(nn(entry.bass))}${entry.bassOctave ?? ''} <b>${esc(d.label)}</b> ${DURATION_SYMBOL[entry.duration]}</span>`;
+  }).join('') + errors.map((r) => `<div class="line-error">${esc(r.item.error)}</div>`).join('');
+  const editing = state.target.type === 'edit';
+  $('line-add').disabled = rows.length === 0 || errors.length > 0 || editing;
+  $('line-add').textContent = state.target.type === 'insert' ? `Insert all before chord ${state.target.index + 1}` : 'Add all to progression';
+  $('line-suggest').disabled = !rows.some((r) => !r.item.error && !r.item.rest && !r.item.figures);
+}
+
+function addLine() {
+  const rows = lineEntries();
+  if (!rows.length || rows.some((r) => r.item.error) || state.target.type === 'edit') return;
+  const entries = rows.map((r) => r.entry);
+  if (state.target.type === 'insert') {
+    state.progression.splice(state.target.index, 0, ...entries);
+    backToAppend();
+  } else {
+    state.progression.push(...entries);
+  }
+  state.lineText = '';
+  update();
+}
+
+function suggestLine() {
+  const key = currentKey();
+  const rows = lineEntries();
+  const basses = rows.map((r) => (r.entry && !r.entry.rest ? r.entry.bass : null));
+  const { prev: before } = neighbours();
+  const tokens = rows.map((r, i) => {
+    if (r.item.error || r.item.rest || r.item.figures) return r.item.raw;
+    const prev = basses.slice(0, i).reverse().find(Boolean) ?? before;
+    const next = basses.slice(i + 1).find(Boolean);
+    const { figures } = suggestFigures(key, r.entry.bass, { prev, next });
+    return formatItem({ ...r.item, figures });
+  });
+  state.lineText = tokens.join('  ');
+  update();
+}
+
 function update() {
   save();
   renderControls();
   const model = compute();
+  renderOctave(model);
+  renderLine();
   renderResult(model);
   renderVoiceLeading(model);
   renderProgression(model);
@@ -445,7 +541,7 @@ function update() {
 // ---------------------------------------------------------------- actions
 
 function setInput(changes) {
-  Object.assign(state, changes, { previewChoice: [] });
+  Object.assign(state, { suggestion: null }, changes, { previewChoice: [] });
   update();
 }
 
@@ -464,6 +560,7 @@ function loadEntry(e) {
   state.mode = e.mode;
   state.bassLetter = e.bass.letter;
   state.bassAcc = e.bass.acc === signatureAcc(key, e.bass.letter) ? 'key' : e.bass.acc;
+  state.bassOctave = e.bassOctave ?? null;
   state.figures = e.figures;
   state.duration = durationOf(e);
   state.rest = !!e.rest;
@@ -503,6 +600,7 @@ function commit() {
   if (t.type === 'append') {
     state.figures = '';
     state.bassAcc = 'key';
+    state.bassOctave = null;
     state.rest = false;
     state.newKeySig = false;
     state.previewChoice = [];
@@ -556,6 +654,24 @@ function bind() {
   $('rest-toggle').addEventListener('click', () => setInput({ rest: !state.rest }));
 
   $('add-chord').addEventListener('click', commit);
+
+  const shiftOctave = (d) => {
+    const bass = focusBass(compute());
+    if (!bass) return;
+    setInput({ bassOctave: Math.min(5, Math.max(1, bass.octave + d)) });
+  };
+  $('octave-down').addEventListener('click', () => shiftOctave(-1));
+  $('octave-up').addEventListener('click', () => shiftOctave(1));
+  $('octave-auto').addEventListener('click', () => setInput({ bassOctave: null }));
+
+  $('suggest-figures').addEventListener('click', () => {
+    const { figures, reason } = suggestFigures(currentKey(), currentBass(), neighbours());
+    setInput({ figures, rest: false, suggestion: `Suggested: ${figures || 'blank (5/3)'}. ${reason}` });
+  });
+
+  $('line-text').addEventListener('input', (e) => { state.lineText = e.target.value; save(); renderLine(); });
+  $('line-add').addEventListener('click', addLine);
+  $('line-suggest').addEventListener('click', suggestLine);
   $('cancel-edit').addEventListener('click', cancelEdit);
   $('delete-chord').addEventListener('click', deleteEdited);
   $('insert-before').addEventListener('click', () => {
