@@ -11,8 +11,32 @@
 <body>
   <header class="topbar">
     <h1>Figured Bass Decoder</h1>
-    <button id="settings-toggle" class="icon-btn" aria-expanded="false" aria-controls="settings">Settings</button>
+    <div class="row tight">
+      <button id="exercises-toggle" class="icon-btn" aria-expanded="false" aria-controls="exercises">Exercises</button>
+      <button id="settings-toggle" class="icon-btn" aria-expanded="false" aria-controls="settings">Settings</button>
+    </div>
   </header>
+
+  <section id="exercises" class="panel settings exercises" hidden aria-label="Exercises">
+    <div class="row">
+      <label class="field-inline grow">
+        <span class="label">Current exercise</span>
+        <input id="exercise-name" type="text" autocomplete="off" placeholder="Untitled exercise">
+      </label>
+      <button id="exercise-new" class="ghost">New</button>
+      <button id="exercise-duplicate" class="ghost">Duplicate</button>
+    </div>
+    <div>
+      <span class="label">Saved in this browser</span>
+      <ul id="exercise-list" class="exercise-list"></ul>
+    </div>
+    <div class="row">
+      <button id="exercise-export" class="ghost">Export file…</button>
+      <button id="exercise-import-btn" class="ghost">Import file…</button>
+      <input id="exercise-import" type="file" accept=".json,application/json" hidden>
+    </div>
+    <p class="hint">Exercises save automatically as you work. Export a file to keep a copy or open it on another device.</p>
+  </section>
 
   <section id="settings" class="panel settings" hidden>
     <div class="field">
@@ -145,6 +169,7 @@
       <div class="panel-head">
         <h2>Progression</h2>
         <div class="row tight">
+          <button id="print-btn" class="ghost" title="Print the score and analysis, or save them as PDF">Print / PDF</button>
           <button id="practice-toggle" class="toggle" aria-pressed="false" title="Write the upper voices yourself and check them">Practice</button>
           <button id="undo" class="ghost">Undo</button>
           <button id="clear-all" class="ghost danger">Clear</button>
@@ -192,6 +217,8 @@
       <ol id="history" class="history"></ol>
     </section>
   </main>
+
+  <section id="print-view" class="print-view" aria-hidden="true"></section>
 
   <footer class="footer">
     Notation by <a href="https://www.vexflow.com/">VexFlow</a>. Voicings follow chorale-style four-part rules; treat them as suggestions.
