@@ -64,3 +64,17 @@ export function vexKeySpec(key) {
   const acc = key.tonic.acc > 0 ? '#'.repeat(key.tonic.acc) : 'b'.repeat(-key.tonic.acc);
   return LETTERS[key.tonic.letter] + acc + (key.mode === 'minor' ? 'm' : '');
 }
+
+/** Key-signature spec independent of mode (the relative major), e.g. A minor -> "C". */
+export function signatureSpec(key) {
+  if (key.mode === 'major') return vexKeySpec(key);
+  const relative = spellOnLetter(key.tonic.letter + 2, (pc(key.tonic) + 3) % 12);
+  return vexKeySpec({ tonic: relative, mode: 'major' });
+}
+
+/** The 15 standard key signatures, as relative-major specs with a label. */
+export const KEY_SIGNATURES = [
+  ['Cb', '7♭'], ['Gb', '6♭'], ['Db', '5♭'], ['Ab', '4♭'], ['Eb', '3♭'], ['Bb', '2♭'], ['F', '1♭'],
+  ['C', 'no ♯/♭'],
+  ['G', '1♯'], ['D', '2♯'], ['A', '3♯'], ['E', '4♯'], ['B', '5♯'], ['F#', '6♯'], ['C#', '7♯'],
+];

@@ -31,6 +31,13 @@
 
   <main class="layout">
     <section class="panel input-panel" aria-label="Input">
+      <div class="edit-banner" id="edit-banner" hidden>
+        <span id="edit-text"></span>
+        <div class="row tight">
+          <button id="insert-before" class="ghost">Insert before</button>
+          <button id="delete-chord" class="ghost danger">Delete</button>
+        </div>
+      </div>
       <div class="field">
         <span class="label">Key</span>
         <div class="row">
@@ -40,6 +47,10 @@
             <button data-value="minor" role="radio">Minor</button>
           </div>
         </div>
+        <label class="check keysig-row" id="keysig-row" hidden>
+          <input type="checkbox" id="new-keysig">
+          <span>The key changes here: print a new key signature in the score</span>
+        </label>
       </div>
 
       <div class="field">
@@ -58,12 +69,13 @@
         <div class="figure-buttons" id="figure-buttons"></div>
         <div class="row">
           <input id="figures" type="text" inputmode="text" autocomplete="off" spellcheck="false"
-                 placeholder="e.g. 6/5, #6 4 3, 7 #, 4-3 (empty = 5/3)">
+                 placeholder="blank, or e.g. 6/5, #6 4 3, 7 #, 4-3">
           <button id="clear-figures" class="ghost" title="Clear figures">✕</button>
         </div>
         <details class="help">
           <summary>How to type figures</summary>
           <ul>
+            <li>Leave the figures blank for an unfigured bass: it means a root-position chord, and nothing is printed under the note. Type <code>5/3</code> if you want it printed.</li>
             <li>Stack figures with spaces or <code>/</code>: <code>6 4</code>, <code>6/5</code>, <code>4/3</code>, <code>4 2</code>. Missing ones are filled in: <code>6</code> = 6/3, <code>7</code> = 7/5/3.</li>
             <li>A lone <code>#</code>, <code>b</code> or <code>n</code> (♮) changes the 3rd above the bass.</li>
             <li>Accidentals on a figure: <code>#6</code>, <code>b7</code>, <code>n6</code>, or after it: <code>6#</code>, <code>6+</code>, <code>6\</code> (slashed).</li>
@@ -73,8 +85,21 @@
         </details>
       </div>
 
+      <div class="field">
+        <span class="label">Note value</span>
+        <div class="row">
+          <div class="segmented" id="duration-choice" role="radiogroup" aria-label="Note value">
+            <button data-value="8" role="radio" title="Eighth note"></button>
+            <button data-value="q" role="radio" title="Quarter note"></button>
+            <button data-value="h" role="radio" title="Half note"></button>
+          </div>
+          <button id="rest-toggle" class="toggle" aria-pressed="false" title="A rest in all voices instead of a chord">Rest</button>
+        </div>
+      </div>
+
       <div class="actions">
-        <button id="add-chord" class="primary">Add to progression <kbd>Enter</kbd></button>
+        <button id="add-chord" class="primary"><span id="add-label">Add to progression</span> <kbd>Enter</kbd></button>
+        <button id="cancel-edit" class="ghost" hidden>Cancel</button>
       </div>
     </section>
 
@@ -95,10 +120,47 @@
         <h2>Progression</h2>
         <div class="row tight">
           <button id="undo" class="ghost">Undo</button>
-          <button id="delete-selected" class="ghost" hidden>Delete chord</button>
           <button id="clear-all" class="ghost danger">Clear</button>
         </div>
       </div>
+      <details class="score-settings" id="score-settings">
+        <summary>Score settings: <span id="score-summary"></span></summary>
+        <div class="score-grid">
+          <label class="field-inline">
+            <span class="label">Time signature</span>
+            <select id="time-sig">
+              <option value="2/4">2/4</option>
+              <option value="3/4">3/4</option>
+              <option value="4/4">4/4</option>
+              <option value="2/2">2/2 (alla breve)</option>
+              <option value="3/8">3/8</option>
+              <option value="6/8">6/8</option>
+              <option value="custom">Custom…</option>
+            </select>
+          </label>
+          <div class="field-inline" id="custom-time" hidden>
+            <span class="label">Custom</span>
+            <div class="row tight">
+              <input id="time-num" type="number" min="1" max="16" aria-label="Beats per bar">
+              <span>/</span>
+              <select id="time-den" aria-label="Beat unit">
+                <option value="2">2</option>
+                <option value="4">4</option>
+                <option value="8">8</option>
+              </select>
+            </div>
+          </div>
+          <label class="field-inline">
+            <span class="label">Pickup (upbeat)</span>
+            <select id="pickup"></select>
+          </label>
+          <label class="field-inline">
+            <span class="label">Key signature at the start</span>
+            <select id="score-key"></select>
+          </label>
+        </div>
+        <p class="hint">Tap a chord in the score or in the list below to edit it.</p>
+      </details>
       <div class="staff-wrap"><div id="staff"></div></div>
       <ol id="history" class="history"></ol>
     </section>
