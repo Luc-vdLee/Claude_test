@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Figured Bass Decoder</title>
+  <meta name="description" content="Enter a bass note, key and figures: get the chord, its notes, Roman numeral and a four-part voicing.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext x='4' y='26' font-size='26'%3E%F0%9D%84%A2%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Figured Bass Decoder</h1>
+    <button id="settings-toggle" class="icon-btn" aria-expanded="false" aria-controls="settings">Settings</button>
+  </header>
+
+  <section id="settings" class="panel settings" hidden>
+    <div class="field">
+      <span class="label">Note names</span>
+      <div class="segmented" id="names-choice" role="radiogroup" aria-label="Note names">
+        <button data-value="english" role="radio">English (C♯, B♭, B)</button>
+        <button data-value="german" role="radio">German (Cis, B, H)</button>
+        <button data-value="dutch" role="radio">Dutch (Cis, Bes, B)</button>
+      </div>
+    </div>
+    <label class="check">
+      <input type="checkbox" id="auto-raise">
+      Raise leading tone in minor automatically (V and V7 without a written ♯)
+    </label>
+  </section>
+
+  <main class="layout">
+    <section class="panel input-panel" aria-label="Input">
+      <div class="field">
+        <span class="label">Key</span>
+        <div class="row">
+          <select id="key-tonic" aria-label="Key tonic"></select>
+          <div class="segmented" id="key-mode" role="radiogroup" aria-label="Mode">
+            <button data-value="major" role="radio">Major</button>
+            <button data-value="minor" role="radio">Minor</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">Bass note</span>
+        <div class="note-grid" id="bass-letters"></div>
+        <div class="segmented small" id="bass-acc" role="radiogroup" aria-label="Bass accidental">
+          <button data-value="key" role="radio" title="As in the key signature">Key sig.</button>
+          <button data-value="-1" role="radio">♭</button>
+          <button data-value="0" role="radio">♮</button>
+          <button data-value="1" role="radio">♯</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="figures">Figures</label>
+        <div class="figure-buttons" id="figure-buttons"></div>
+        <div class="row">
+          <input id="figures" type="text" inputmode="text" autocomplete="off" spellcheck="false"
+                 placeholder="e.g. 6/5, #6 4 3, 7 #, 4-3 (empty = 5/3)">
+          <button id="clear-figures" class="ghost" title="Clear figures">✕</button>
+        </div>
+        <details class="help">
+          <summary>How to type figures</summary>
+          <ul>
+            <li>Stack figures with spaces or <code>/</code>: <code>6 4</code>, <code>6/5</code>, <code>4/3</code>, <code>4 2</code>. Missing ones are filled in: <code>6</code> = 6/3, <code>7</code> = 7/5/3.</li>
+            <li>A lone <code>#</code>, <code>b</code> or <code>n</code> (♮) changes the 3rd above the bass.</li>
+            <li>Accidentals on a figure: <code>#6</code>, <code>b7</code>, <code>n6</code>, or after it: <code>6#</code>, <code>6+</code>, <code>6\</code> (slashed).</li>
+            <li>A sharp raises the note in the key signature by a half step, so in F major <code>#</code> above G turns B♭ into B♮.</li>
+            <li>Use <code>-</code> for figures that follow each other over one bass: <code>4-3</code>, <code>9-8</code>, <code>7-6</code>, <code>6/4-5/3</code>.</li>
+          </ul>
+        </details>
+      </div>
+
+      <div class="actions">
+        <button id="add-chord" class="primary">Add to progression <kbd>Enter</kbd></button>
+      </div>
+    </section>
+
+    <section class="panel result-panel" aria-live="polite" aria-label="Result">
+      <div id="result"></div>
+    </section>
+
+    <section class="panel voice-panel" aria-label="Voice leading">
+      <div class="panel-head">
+        <h2>Voice leading</h2>
+        <button id="next-voicing" class="ghost">Try another voicing ↻</button>
+      </div>
+      <div id="voice-leading"></div>
+    </section>
+
+    <section class="panel progression-panel" aria-label="Progression">
+      <div class="panel-head">
+        <h2>Progression</h2>
+        <div class="row tight">
+          <button id="undo" class="ghost">Undo</button>
+          <button id="delete-selected" class="ghost" hidden>Delete chord</button>
+          <button id="clear-all" class="ghost danger">Clear</button>
+        </div>
+      </div>
+      <div class="staff-wrap"><div id="staff"></div></div>
+      <ol id="history" class="history"></ol>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Notation by <a href="https://www.vexflow.com/">VexFlow</a>. Voicings follow chorale-style four-part rules; treat them as suggestions.
+  </footer>
+
+  <script src="vendor/vexflow-4.2.2.js"></script>
+  <script type="module" src="src/ui/app.js"></script>
+</body>
+</html>
