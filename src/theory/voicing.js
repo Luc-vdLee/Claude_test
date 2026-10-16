@@ -176,14 +176,15 @@ function firstChordCost(midis) {
   return Math.abs(s - IDEAL_FIRST_SOPRANO) / 2 + Math.max(0, s - a - 7) / 2 + Math.max(0, a - t - 7) / 2;
 }
 
-/** All valid voicings of a chord, best first. */
-export function rankVoicings(spec, prev, prevBass) {
+/** All valid voicings of a chord, best first. `fixedBass` (midi) pins the bass octave. */
+export function rankVoicings(spec, prev, prevBass, fixedBass = null) {
   const pcs = new Set(spec.map((e) => e.pc));
   const sOpts = rangeOptions(RANGES.Soprano, pcs);
   const aOpts = rangeOptions(RANGES.Alto, pcs);
   const tOpts = rangeOptions(RANGES.Tenor, pcs);
   const out = [];
-  for (const { midi: bass, cost: bassCost } of bassOptions(spec, prev ? prev.midis[0] : prevBass)) for (const s of sOpts) {
+  const basses = fixedBass != null ? [{ midi: fixedBass, cost: 0 }] : bassOptions(spec, prev ? prev.midis[0] : prevBass);
+  for (const { midi: bass, cost: bassCost } of basses) for (const s of sOpts) {
     for (const a of aOpts) {
       if (a > s || s - a > 12) continue;
       for (const t of tOpts) {
@@ -211,14 +212,15 @@ function describe(spec, midis, prev) {
 /**
  * Voice a whole progression. `chords` is a list of decoded chords (from decode()),
  * or null for a rest (skipped: the next chord connects to the one before the rest);
- * `choices[i][stage]` picks an alternative (0 = best) for that stage.
+ * `choices[i][stage]` picks an alternative (0 = best) for that stage;
+ * `fixedBass[i]` (midi) pins chord i's bass to an octave instead of choosing it.
  * Returns, per chord, a list of stage voicings.
  */
-export function voiceProgression(chords, choices = []) {
+export function voiceProgression(chords, choices = [], fixedBass = []) {
   let prev = null;
   return chords.map((chord, ci) => (chord ? chord.stages.map((stage, si) => {
     const spec = buildSpec(stage);
-    const ranked = rankVoicings(spec, prev, null);
+    const ranked = rankVoicings(spec, prev, null, fixedBass[ci] ?? null);
     if (ranked.length === 0) {
       prev = null;
       return { spec, midis: null, notes: null, issues: [{ level: 'error', text: 'No four-part voicing fits the voice ranges.' }], alternatives: 0, choice: 0 };
@@ -226,7 +228,11 @@ export function voiceProgression(chords, choices = []) {
     const choice = Math.min(choices[ci]?.[si] ?? 0, ranked.length - 1);
     const { midis } = ranked[choice];
     const notes = midis.map((m) => withOctave(entryFor(spec, m).note, m));
-    const result = { spec, midis, notes, issues: describe(spec, midis, prev), alternatives: ranked.length, choice, prevMidis: prev?.midis ?? null };
+    const issues = describe(spec, midis, prev);
+    if (si === 0 && (midis[0] < RANGES.Bass[0] || midis[0] > RANGES.Bass[1])) {
+      issues.unshift({ level: 'warn', text: 'The bass is outside the usual range (E2–D4).' });
+    }
+    const result = { spec, midis, notes, issues, alternatives: ranked.length, choice, prevMidis: prev?.midis ?? null };
     prev = { spec, midis };
     return result;
   }) : null));

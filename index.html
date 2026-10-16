@@ -56,11 +56,19 @@
       <div class="field">
         <span class="label">Bass note</span>
         <div class="note-grid" id="bass-letters"></div>
-        <div class="segmented small" id="bass-acc" role="radiogroup" aria-label="Bass accidental">
-          <button data-value="key" role="radio" title="As in the key signature">Key sig.</button>
-          <button data-value="-1" role="radio">♭</button>
-          <button data-value="0" role="radio">♮</button>
-          <button data-value="1" role="radio">♯</button>
+        <div class="row bass-row">
+          <div class="segmented small" id="bass-acc" role="radiogroup" aria-label="Bass accidental">
+            <button data-value="key" role="radio" title="As in the key signature">Key sig.</button>
+            <button data-value="-1" role="radio">♭</button>
+            <button data-value="0" role="radio">♮</button>
+            <button data-value="1" role="radio">♯</button>
+          </div>
+          <div class="octave-ctl" role="group" aria-label="Bass octave">
+            <button id="octave-down" title="Bass an octave lower">↓ 8va</button>
+            <span id="octave-label" class="octave-label" aria-live="polite"></span>
+            <button id="octave-up" title="Bass an octave higher">↑ 8va</button>
+            <button id="octave-auto" class="ghost" title="Let the app choose the octave">Auto</button>
+          </div>
         </div>
       </div>
 
@@ -71,6 +79,7 @@
           <input id="figures" type="text" inputmode="text" autocomplete="off" spellcheck="false"
                  placeholder="blank, or e.g. 6/5, #6 4 3, 7 #, 4-3">
           <button id="clear-figures" class="ghost" title="Clear figures">✕</button>
+          <button id="suggest-figures" class="ghost" title="Suggest figures with the Rule of the Octave">Suggest</button>
         </div>
         <details class="help">
           <summary>How to type figures</summary>
@@ -101,6 +110,22 @@
         <button id="add-chord" class="primary"><span id="add-label">Add to progression</span> <kbd>Enter</kbd></button>
         <button id="cancel-edit" class="ghost" hidden>Cancel</button>
       </div>
+
+      <details class="line-entry" id="line-entry">
+        <summary>Type a whole bass line</summary>
+        <textarea id="line-text" rows="3" spellcheck="false" autocomplete="off"
+                  placeholder="C  D:6/4/3  E:6  F:6/5  G/h:6/4-5/3  C/h"></textarea>
+        <div id="line-preview" class="line-preview" aria-live="polite"></div>
+        <div class="row">
+          <button id="line-suggest" class="ghost">Suggest figures for blanks</button>
+          <button id="line-add" class="ghost strong">Add all to progression</button>
+        </div>
+        <ul class="hint line-help">
+          <li>Separate notes with spaces. Plain letters follow the key signature; add <code>#</code>, <code>b</code> or <code>n</code> to change that.</li>
+          <li>Octave: <code>C2</code>, <code>G3</code>. Note value: <code>/8</code>, <code>/q</code>, <code>/h</code> (otherwise the selected value).</li>
+          <li>Figures after a colon, with <code>/</code> or <code>,</code> between them: <code>D:6/4/3</code>, <code>E:7,#</code>, <code>G/h:6/4-5/3</code>. Rest: <code>r</code> or <code>r/h</code>.</li>
+        </ul>
+      </details>
     </section>
 
     <section class="panel result-panel" aria-live="polite" aria-label="Result">
