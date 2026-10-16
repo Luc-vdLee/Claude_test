@@ -17,6 +17,8 @@ Every chord you add goes into the progression, which is drawn as a score on a gr
 - **Suggest figures** for a bass note, or for all blank notes in a typed line, with the Rule of the Octave (rising and falling, major and minor).
 - **Piano keyboard**: the current voicing is shown on a keyboard, colored by voice, with the previous chord as faint outlines.
 - **Practice mode**: write the soprano, alto and tenor yourself (tap the staff or the keyboard; ♭ ♮ ♯ and ↑/↓ adjust the note), then *Check my voices*: wrong notes, spelling, missing chord members, doubling, crossing, spacing, parallels and unresolved tendency tones are marked per chord. *Show solution* shows the app's voicing.
+- **Print / PDF**: a clean page with the score (figures and Roman numerals) and an analysis table of every chord; use the browser's *Save as PDF* to get a file.
+- **Exercises**: progressions save automatically as named exercises in the browser. Open, rename, duplicate or delete them, and export/import `.figbass.json` files to move them between devices.
 - **Editing**: tap a chord in the score or the list to edit it, insert a chord before it, or delete it. The chords after it are re-voiced. Note names can be shown in English (C♯, B♭, B), German (Cis, B, H) or Dutch (Cis, Bes, B).
 
 **Live app:** https://luc-vdlee.github.io/Claude_test/

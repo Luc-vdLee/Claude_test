@@ -11,6 +11,7 @@ import { renderScore } from './staff.js';
 import { renderKeyboard, VOICE_COLORS } from './keyboard.js';
 
 const STORAGE_KEY = 'figured-bass-decoder:v1';
+const EXERCISES_KEY = 'figured-bass-decoder:exercises';
 const MAX_ALTERNATIVES = 8;
 const PREVIEW_COLOR = '#b0601e';
 const EDIT_COLOR = '#1d5fa8';
@@ -34,6 +35,8 @@ const defaults = () => ({
   draft: null, // the new-chord inputs, kept while editing another chord
   suggestion: null, // explanation of the last suggested figures
   practice: { on: false, voice: 3, sel: null, showSolution: false, checked: false },
+  exerciseId: null,
+  exerciseName: 'Exercise 1',
   lineText: '',
   settings: { names: 'english', autoRaise: false },
   score: { timeSig: '4/4', customNum: 5, customDen: 4, pickup: 0, keySig: 'auto' },
@@ -59,6 +62,106 @@ function save() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch { /* storage unavailable: fine */ }
+  saveCurrentExercise();
+}
+
+// ---------------------------------------------------------------- exercises
+
+let exercises = loadExercises();
+
+function loadExercises() {
+  try {
+    const list = JSON.parse(localStorage.getItem(EXERCISES_KEY) || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function storeExercises() {
+  try {
+    localStorage.setItem(EXERCISES_KEY, JSON.stringify(exercises));
+  } catch { /* storage unavailable: fine */ }
+}
+
+const newId = () => `ex-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+
+function exerciseData() {
+  return { tonic: state.tonic, mode: state.mode, progression: state.progression, score: state.score };
+}
+
+function saveCurrentExercise() {
+  if (!state.exerciseId) state.exerciseId = newId();
+  const data = JSON.parse(JSON.stringify(exerciseData()));
+  const existing = exercises.find((x) => x.id === state.exerciseId);
+  if (existing) Object.assign(existing, { name: state.exerciseName, data, updated: Date.now() });
+  else exercises.unshift({ id: state.exerciseId, name: state.exerciseName, data, updated: Date.now() });
+  storeExercises();
+}
+
+function openExercise(x) {
+  const d = x.data ?? {};
+  state.exerciseId = x.id;
+  state.exerciseName = x.name;
+  state.progression = Array.isArray(d.progression) ? d.progression : [];
+  if (d.score) state.score = { ...defaults().score, ...d.score };
+  if (d.tonic) { state.tonic = d.tonic; state.mode = d.mode ?? 'major'; }
+  backToAppend();
+  state.practice.sel = null;
+  state.previewChoice = [];
+}
+
+function uniqueName(base) {
+  const names = new Set(exercises.map((x) => x.name));
+  if (!names.has(base)) return base;
+  let n = 2;
+  while (names.has(`${base} ${n}`)) n++;
+  return `${base} ${n}`;
+}
+
+function newExercise(name, data) {
+  saveCurrentExercise();
+  const x = { id: newId(), name: uniqueName(name), data: data ?? { tonic: state.tonic, mode: state.mode, progression: [], score: state.score }, updated: Date.now() };
+  exercises.unshift(x);
+  openExercise(x);
+  update();
+}
+
+function renderExercises() {
+  const nameInput = $('exercise-name');
+  if (document.activeElement !== nameInput) nameInput.value = state.exerciseName;
+  const fmt = (t) => new Date(t).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+  $('exercise-list').innerHTML = exercises.map((x) => {
+    const n = x.data?.progression?.length ?? 0;
+    const current = x.id === state.exerciseId;
+    return `<li class="${current ? 'current' : ''}">
+      <span class="ex-name">${esc(x.name)}<span class="ex-meta">${n} chord${n === 1 ? '' : 's'} · ${esc(fmt(x.updated))}${current ? ' · open' : ''}</span></span>
+      ${current ? '' : `<button class="ghost" data-open="${x.id}">Open</button>`}
+      <button class="ghost danger" data-delete="${x.id}" title="Delete">Delete</button>
+    </li>`;
+  }).join('');
+}
+
+function exportExercise() {
+  const payload = { app: 'figured-bass-decoder', version: 1, name: state.exerciseName, data: exerciseData() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${(state.exerciseName || 'exercise').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'exercise'}.figbass.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+async function importExercise(file) {
+  try {
+    const payload = JSON.parse(await file.text());
+    if (payload?.app !== 'figured-bass-decoder' || !Array.isArray(payload?.data?.progression)) throw new Error('not an exercise file');
+    newExercise(payload.name || file.name.replace(/\.figbass\.json$|\.json$/, ''), payload.data);
+  } catch (err) {
+    alert(`Couldn't open that file: ${err.message}.`);
+  }
 }
 
 const $ = (id) => document.getElementById(id);
@@ -597,22 +700,11 @@ function renderPractice(model) {
   });
 }
 
-function renderProgression(model) {
-  const { entries, decoded, voiced, focus } = model;
-  const practice = state.practice.on && model.practicing;
-  const showUser = practice && !state.practice.showSolution;
-  const statusOf = (i) => {
-    const steps = model.practice.filter((s) => s.event === i);
-    if (!steps.length || steps.some((s) => !s.complete)) return null;
-    const order = ['ok', 'warn', 'error'];
-    return steps.map(stepStatus).reduce((a, b) => (order.indexOf(b) > order.indexOf(a) ? b : a), 'ok');
-  };
-  const color = (i) => {
-    if (practice) return state.practice.checked && showUser ? STATUS_COLOR[statusOf(i)] : undefined;
-    return i === focus ? (state.target.type === 'edit' ? EDIT_COLOR : PREVIEW_COLOR) : undefined;
-  };
-
-  // Score (in practice mode: the bass plus the user's own upper voices)
+/**
+ * Score data for renderScore. `showUser` draws the user's practice voices instead of the
+ * app's voicing; `color(i)` and `selectedOf(i, stage)` decorate chords.
+ */
+function scoreFor({ entries, decoded, voiced }, { showUser = false, color = () => undefined, selectedOf = () => false } = {}) {
   const stagesFor = (e, i) => {
     if (!showUser || !voiced[i]) return voiced[i];
     return voiced[i].map((v, si) => {
@@ -638,16 +730,75 @@ function renderProgression(model) {
     stages: e.rest ? [] : decoded[i].stages.map((_, si) => ({
       figures: decoded[i].written[si] ?? [],
       numeral: si === 0 ? shortNumeral(decoded[i]) : '',
-      selected: practice && state.practice.sel?.event === i && state.practice.sel?.stage === si,
+      selected: selectedOf(i, si),
     })),
   }));
-  renderScore($('staff'), {
-    bars,
-    timeSig: timeSig(),
-    events: info,
-    emptyKey: initialKey,
-    onSelect: (hit) => (practice ? placeFromStaff(hit) : selectEvent(hit.event)),
+  return { bars, timeSig: timeSig(), events: info, emptyKey: initialKey };
+}
+
+function printScore() {
+  const model = storedModel();
+  const view = $('print-view');
+  const practicing = state.practice.on && !state.practice.showSolution;
+  const sig = timeSig();
+  const firstKey = model.entries[0] ? entryKey(model.entries[0]) : currentKey();
+  view.innerHTML = `
+    <h1>${esc(state.exerciseName || 'Figured bass')}</h1>
+    <p class="print-sub">${esc(keyName(firstKey, sys()))} · ${sig.num}/${sig.den}${practicing ? ' · your realization' : ''}</p>
+    <div class="print-staff"><div id="print-staff"></div></div>
+    <table>
+      <thead><tr><th>#</th><th>Bass</th><th>Figures</th><th>Chord</th><th>Notes</th><th>Numeral</th><th>Value</th></tr></thead>
+      <tbody>${model.entries.map((e, i) => {
+        const value = DURATION_NAMES[durationOf(e)];
+        if (e.rest) return `<tr><td>${i + 1}</td><td colspan="5">Rest</td><td>${value}</td></tr>`;
+        const d = model.decoded[i];
+        const bassNote = model.voiced[i]?.[0]?.notes?.[0];
+        const notes = d.stages.map((st) => st.analysis.pitches.map((n) => nn(n)).join(' ')).join(' → ');
+        const figs = d.written.map((l) => (l.length ? l.join('/') : 'blank')).join(' – ');
+        const name = d.main.type === 'tertian' ? `${chordSymbolText(d.main, sys())} (${nn(d.main.root)} ${d.main.longName}${d.main.inversionName ? ', ' + d.main.inversionName : ''})` : (d.main.longName ?? '');
+        return `<tr><td>${i + 1}</td><td>${esc(bassNote ? pitchName(bassNote, sys()) : nn(e.bass))}</td><td class="fig">${esc(figs)}</td><td>${esc(name)}</td><td>${esc(notes)}</td><td class="fig">${esc(d.label)}</td><td>${value}</td></tr>`;
+      }).join('')}</tbody>
+    </table>
+    <p class="print-foot">Figured Bass Decoder · voicings follow chorale-style four-part rules.</p>`;
+  view.classList.add('preparing');
+  renderScore($('print-staff'), scoreFor(model, { showUser: practicing }));
+  const svg = $('print-staff').querySelector('svg');
+  if (svg) svg.setAttribute('viewBox', `0 0 ${svg.getAttribute('width')} ${svg.getAttribute('height')}`);
+  const done = () => { view.classList.remove('preparing'); view.innerHTML = ''; window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  window.print();
+}
+
+/** The stored progression only (no input preview), voiced. */
+function storedModel() {
+  const entries = state.progression;
+  const decoded = entries.map(decodeEntry);
+  const fixedBass = entries.map((e) => (e.rest || e.bassOctave == null ? null : midi({ ...e.bass, octave: e.bassOctave })));
+  const voiced = voiceProgression(decoded, entries.map((e) => e.choice ?? []), fixedBass);
+  return { entries, decoded, voiced };
+}
+
+function renderProgression(model) {
+  const { entries, decoded, voiced, focus } = model;
+  const practice = state.practice.on && model.practicing;
+  const showUser = practice && !state.practice.showSolution;
+  const statusOf = (i) => {
+    const steps = model.practice.filter((s) => s.event === i);
+    if (!steps.length || steps.some((s) => !s.complete)) return null;
+    const order = ['ok', 'warn', 'error'];
+    return steps.map(stepStatus).reduce((a, b) => (order.indexOf(b) > order.indexOf(a) ? b : a), 'ok');
+  };
+  const color = (i) => {
+    if (practice) return state.practice.checked && showUser ? STATUS_COLOR[statusOf(i)] : undefined;
+    return i === focus ? (state.target.type === 'edit' ? EDIT_COLOR : PREVIEW_COLOR) : undefined;
+  };
+
+  const score = scoreFor(model, {
+    showUser,
+    color,
+    selectedOf: (i, si) => practice && state.practice.sel?.event === i && state.practice.sel?.stage === si,
   });
+  renderScore($('staff'), { ...score, onSelect: (hit) => (practice ? placeFromStaff(hit) : selectEvent(hit.event)) });
 
   // History list (the stored progression; the input is shown at its position)
   const items = state.progression.map((e, i) => {
@@ -759,6 +910,7 @@ function suggestLine() {
 
 function update() {
   save();
+  renderExercises();
   renderControls();
   const model = compute();
   renderOctave(model);
@@ -897,6 +1049,43 @@ function bind() {
   $('suggest-figures').addEventListener('click', () => {
     const { figures, reason } = suggestFigures(currentKey(), currentBass(), neighbours());
     setInput({ figures, rest: false, suggestion: `Suggested: ${figures || 'blank (5/3)'}. ${reason}` });
+  });
+
+  $('print-btn').addEventListener('click', printScore);
+
+  $('exercises-toggle').addEventListener('click', () => {
+    const panel = $('exercises');
+    panel.hidden = !panel.hidden;
+    $('exercises-toggle').setAttribute('aria-expanded', String(!panel.hidden));
+  });
+  $('exercise-name').addEventListener('input', (e) => { state.exerciseName = e.target.value; save(); renderExercises(); });
+  $('exercise-new').addEventListener('click', () => newExercise(`Exercise ${exercises.length + 1}`));
+  $('exercise-duplicate').addEventListener('click', () => newExercise(`${state.exerciseName} (copy)`, JSON.parse(JSON.stringify(exerciseData()))));
+  $('exercise-list').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.open) {
+      saveCurrentExercise();
+      const x = exercises.find((y) => y.id === b.dataset.open);
+      if (x) { openExercise(x); update(); }
+    } else if (b.dataset.delete) {
+      const x = exercises.find((y) => y.id === b.dataset.delete);
+      if (!x || !confirm(`Delete "${x.name}"? This can't be undone.`)) return;
+      exercises = exercises.filter((y) => y.id !== x.id);
+      storeExercises();
+      if (x.id === state.exerciseId) {
+        if (exercises.length) openExercise(exercises[0]);
+        else { state.exerciseId = null; state.exerciseName = 'Exercise 1'; state.progression = []; backToAppend(); }
+      }
+      update();
+    }
+  });
+  $('exercise-export').addEventListener('click', exportExercise);
+  $('exercise-import-btn').addEventListener('click', () => $('exercise-import').click());
+  $('exercise-import').addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) importExercise(file);
+    e.target.value = '';
   });
 
   $('practice-toggle').addEventListener('click', () => {
