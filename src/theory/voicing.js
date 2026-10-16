@@ -6,7 +6,7 @@
 // tendency tones (leading tone, 7ths, suspensions, augmented 6ths) and
 // augmented melodic intervals. The lowest score wins; the rest are alternatives.
 
-import { pc, spellingKey, sameSpelling, withOctave, intervalName } from './pitch.js';
+import { pc, midi, noteName, spellingKey, sameSpelling, withOctave, intervalName } from './pitch.js';
 
 export const VOICES = ['Bass', 'Tenor', 'Alto', 'Soprano'];
 export const RANGES = { Bass: [40, 62], Tenor: [48, 67], Alto: [55, 74], Soprano: [60, 79] };
@@ -245,4 +245,53 @@ export function tendenciesOf(voiced) {
     const e = entryFor(voiced.spec, m);
     return e.tendency ? { kind: e.kind, direction: e.tendency, suspension: e.suspension } : null;
   });
+}
+
+const MEMBER_NAMES = {
+  root: 'root', third: '3rd', fifth: '5th', seventh: '7th',
+  'aug6-low': 'lower note of the augmented 6th', 'aug6-high': 'upper note of the augmented 6th', 'aug6-third': '3rd', 'aug6-other': 'added tone',
+};
+
+/**
+ * Check a voicing written by the user.
+ * @param {Array} spec      from buildSpec
+ * @param {Array} notes     [bass, tenor, alto, soprano] as spelled pitches with octaves
+ * @param {{spec, midis}|null} prev  the previous (valid) voicing, for voice-leading checks
+ * @returns {{ issues: Array<{level, text}>, valid: boolean }}  valid = only chord tones, usable as `prev`
+ */
+export function checkVoicing(spec, notes, prev) {
+  const issues = [];
+  const midis = notes.map(midi);
+  let wrong = false;
+  for (let v = 1; v < 4; v++) {
+    const e = entryFor(spec, midis[v]);
+    if (!e) {
+      wrong = true;
+      issues.push({ level: 'error', text: `${VOICES[v]}: ${noteName(notes[v])} is not in this chord.` });
+    } else if (!sameSpelling(e.note, notes[v])) {
+      issues.push({ level: 'warn', text: `${VOICES[v]}: spell ${noteName(notes[v])} as ${noteName(e.note)}.` });
+    }
+  }
+  for (let v = 0; v < 3; v++) {
+    if (midis[v] > midis[v + 1]) issues.push({ level: 'error', text: `Voice crossing: the ${VOICES[v + 1].toLowerCase()} is below the ${VOICES[v].toLowerCase()}.` });
+  }
+  if (midis[3] - midis[2] > 12) issues.push({ level: 'warn', text: 'More than an octave between soprano and alto.' });
+  if (midis[2] - midis[1] > 12) issues.push({ level: 'warn', text: 'More than an octave between alto and tenor.' });
+  for (let v = 1; v < 4; v++) {
+    const [lo, hi] = RANGES[VOICES[v]];
+    if (midis[v] < lo || midis[v] > hi) issues.push({ level: 'info', text: `${VOICES[v]} is outside its usual range.` });
+  }
+  if (wrong) return { issues, valid: false };
+
+  const counts = new Map(spec.map((e) => [e.pc, 0]));
+  for (const m of midis) counts.set(((m % 12) + 12) % 12, counts.get(((m % 12) + 12) % 12) + 1);
+  for (const e of spec) {
+    if (counts.get(e.pc) === 0 && e.required) {
+      issues.push({ level: 'error', text: `Missing the ${MEMBER_NAMES[e.member] ?? noteName(e.note)} (${noteName(e.note)}).` });
+    }
+  }
+  staticCost(spec, midis, issues);
+  if (prev) transitionCost(prev.spec, prev.midis, spec, midis, issues);
+  const seen = new Set();
+  return { issues: issues.filter((i) => (seen.has(i.text) ? false : seen.add(i.text))), valid: true };
 }

@@ -46,7 +46,7 @@ export function buildVoices(events) {
   const stageStarts = [];
   let t = 0;
   events.forEach((ev, ei) => {
-    const playable = !ev.rest && ev.stages?.length && ev.stages.every((s) => s.midis);
+    const playable = !ev.rest && ev.stages?.length && ev.stages.every((s) => s.midis && s.midis[0] != null);
     if (!playable) {
       for (const v of voices) v.push({ start: t, ticks: ev.ticks, note: null, midi: null, event: ei, stage: 0 });
       if (!ev.rest) stageStarts.push({ tick: t, event: ei, stage: 0 });
@@ -66,8 +66,9 @@ export function buildVoices(events) {
         const len = parts[si];
         if (len === 0) return;
         const last = voices[v][voices[v].length - 1];
-        if (si > 0 && last && last.event === ei && last.midi === stage.midis[v]) last.ticks += len; // held note
-        else voices[v].push({ start, ticks: len, note: stage.notes[v], midi: stage.midis[v], event: ei, stage: si });
+        const note = stage.notes[v] ?? null;
+        if (si > 0 && last && last.event === ei && last.midi === (stage.midis[v] ?? null)) last.ticks += len; // held note
+        else voices[v].push({ start, ticks: len, note, midi: stage.midis[v] ?? null, event: ei, stage: si, ghost: !note });
         start += len;
       });
     }
@@ -115,7 +116,7 @@ export function layoutBars(built, opts) {
         values.forEach((val) => {
           b.voices[v].push({
             start: pos, ticks: val.ticks, duration: val.duration, dots: val.dots,
-            note: seg.note, rest: !seg.note, event: seg.event, stage: seg.stage,
+            note: seg.note, rest: !seg.note, ghost: !!seg.ghost, event: seg.event, stage: seg.stage,
             tieToNext: !!seg.note && pos + val.ticks < end,
           });
           pos += val.ticks;
