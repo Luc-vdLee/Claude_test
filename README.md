@@ -7,6 +7,8 @@ A small web app for realizing figured bass. Pick a key, a bass note and the figu
 - **the Roman numeral**, including secondary dominants (`V65/V`), the Neapolitan (`N6`) and augmented sixths (`It+6`, `Fr+6`, `Ger+6`)
 - **a four-part (SATB) voicing** that connects smoothly to the previous chord: no parallel 5ths or octaves, the leading tone rises, 7ths and suspensions resolve down. If you'd like something different, *Try another voicing* cycles through the next-best options.
 
+**Layout**: the chord you are working on always sits in a strip at the top: key, bass note, accidental, octave and note value on the left, the figures in the middle, and the result with *Add to score* on the right. The figure buttons show one row of common figures (blank, 5/3, 6, 6/4, 7, 6/5); *More* opens two extra rows with the rest and keeps them open until you press *Less*. Below the strip, tabs hold the Score, Voicing, Keyboard, Bass line, Exercises and Settings. On a computer or iPad everything fits on one screen and only the tab content scrolls; on a phone the page scrolls as before.
+
 Every chord you add goes into the progression, which is drawn as a score on a grand staff with the figures and Roman numerals underneath:
 
 - **Note values**: eighth, quarter or half notes, plus rests in all voices. In a suspension (`4-3`) the bass holds while the upper voices move.

@@ -15,11 +15,15 @@ import * as sound from './sound.js';
 const STORAGE_KEY = 'figured-bass-decoder:v1';
 const EXERCISES_KEY = 'figured-bass-decoder:exercises';
 const MAX_ALTERNATIVES = 8;
-const PREVIEW_COLOR = '#b0601e';
+const PREVIEW_COLOR = '#2e5d4b';
 const EDIT_COLOR = '#1d5fa8';
-const PLAY_COLOR = '#2f7d3a';
+const PLAY_COLOR = '#b0601e';
 
 const FIGURE_BUTTONS = ['', '5/3', '6', '6/4', '7', '6/5', '4/3', '4/2', '#', 'b', 'n', '7 #', '#6', '4-3', '9-8', '7-6', '6/4-5/3'];
+// The first row of figure buttons; the rest appear under "More".
+const FIGURE_COMMON = ['', '5/3', '6', '6/4', '7', '6/5'];
+const FIGURE_MORE = FIGURE_BUTTONS.filter((v) => !FIGURE_COMMON.includes(v));
+const TABS = ['score', 'voicing', 'keyboard', 'line', 'exercises', 'settings'];
 // Parts of the page that can be switched off in Settings (all on by default).
 const PARTS = [
   ['octave', 'Bass octave controls'],
@@ -60,6 +64,8 @@ const defaults = () => ({
     names: 'english',
     autoRaise: false,
     quickAdd: false,
+    moreFigures: false, // the extra rows of figure buttons are open
+    tab: 'score',
     show: Object.fromEntries(PARTS.map(([k]) => [k, true])),
     sound: { voices: [true, true, true, true], loop: false }, // voices: bass, tenor, alto, soprano
   },
@@ -157,6 +163,8 @@ function newExercise(name, data) {
 function renderExercises() {
   const nameInput = $('exercise-name');
   if (document.activeElement !== nameInput) nameInput.value = state.exerciseName;
+  $('topbar-ex').textContent = state.exerciseName;
+  $('tabs-ex').textContent = state.exerciseName;
   const fmt = (t) => new Date(t).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
   $('exercise-list').innerHTML = exercises.map((x) => {
     const n = x.data?.progression?.length ?? 0;
@@ -474,11 +482,18 @@ function renderControls() {
   const fig = $('figures');
   if (fig.value !== state.figures) fig.value = state.figures;
   fig.disabled = state.rest;
-  $('figure-buttons').innerHTML = FIGURE_BUTTONS.map((v) => {
+  const figButton = (v) => {
     const lines = parseFigures(v).written.map(figureLines);
     const title = v === '' ? 'Blank: unfigured bass (root position, nothing printed)' : v;
     return `<button data-fig="${esc(v)}" aria-pressed="${!state.rest && v === state.figures.trim()}" title="${esc(title)}" ${state.rest ? 'disabled' : ''}>${stagesHTML(lines)}</button>`;
-  }).join('');
+  };
+  $('figure-buttons').innerHTML = FIGURE_COMMON.map(figButton).join('');
+  $('figure-more').innerHTML = FIGURE_MORE.map(figButton).join('');
+  const more = state.settings.moreFigures;
+  $('figure-more').hidden = !more;
+  $('fig-more').textContent = more ? 'Less ▴' : 'More ▾';
+  $('fig-more').setAttribute('aria-expanded', String(more));
+  $('fig-more').classList.toggle('has-sel', !more && !state.rest && FIGURE_MORE.includes(state.figures.trim()));
 
   for (const b of $('duration-choice').querySelectorAll('button')) if (!b.innerHTML) b.innerHTML = noteIcon(b.dataset.value);
   $('rest-toggle').setAttribute('aria-pressed', String(state.rest));
@@ -490,8 +505,11 @@ function renderControls() {
   if (t.type === 'insert') $('edit-text').textContent = `Inserting before chord ${t.index + 1}`;
   $('insert-before').hidden = t.type !== 'edit';
   $('delete-chord').hidden = t.type !== 'edit';
-  $('add-label').textContent = { append: 'Add to progression', edit: 'Save changes', insert: 'Insert chord' }[t.type];
+  $('add-label').textContent = { append: 'Add to score', edit: 'Save changes', insert: 'Insert chord' }[t.type];
   $('cancel-edit').hidden = t.type === 'append';
+  // While editing, the banner above already says which chord it is.
+  $('strip-eyebrow').hidden = t.type !== 'append';
+  $('strip-eyebrow').textContent = `Working on chord ${state.progression.length + 1}`;
   document.body.classList.toggle('editing', t.type !== 'append');
 
   // Score settings
@@ -524,8 +542,18 @@ function renderParts() {
     const on = show[k] || (k === 'voicePanel' && practicing);
     for (const el of document.querySelectorAll(`[data-part="${k}"]`)) el.classList.toggle('part-off', !on);
   }
-  $('voice-panel').classList.toggle('part-off', !practicing && !show.voicePanel && !show.keyboard);
-  document.body.classList.toggle('no-voice-panel', !practicing && !show.voicePanel && !show.keyboard);
+  $('voice-panel').classList.toggle('part-off', !practicing && !show.voicePanel);
+  renderTabs();
+}
+
+/** Show the chosen tab. In practice mode the Score tab also shows the voicing and keyboard you write with. */
+function renderTabs() {
+  const button = (tab) => document.querySelector(`#tabs [data-tab="${tab}"]`);
+  let tab = TABS.includes(state.settings.tab) ? state.settings.tab : 'score';
+  if (button(tab).classList.contains('part-off')) tab = 'score';
+  const shown = state.practice.on && tab === 'score' ? ['score', 'voicing', 'keyboard'] : [tab];
+  for (const t of TABS) button(t).setAttribute('aria-selected', String(t === tab));
+  for (const el of document.querySelectorAll('[data-tab-panel]')) el.classList.toggle('active', shown.includes(el.dataset.tabPanel));
 }
 
 // ---------------------------------------------------------------- sound
@@ -913,7 +941,7 @@ function renderProgression(model) {
     const insertMark = state.target.type === 'insert' && state.target.index === i ? '<li class="insert-mark" aria-label="Insert position">▸</li>' : '';
     return `${insertMark}<li><button data-index="${i}" aria-pressed="${pressed}"${playing?.index === i ? ' class="playing"' : ''}><span class="idx">${i + 1}${e.newKeySig && i > 0 ? ' 🔑' : ''}</span>${body}</button></li>`;
   });
-  $('history').innerHTML = items.join('') || '<li class="empty">No chords yet. Choose a bass and figures, then press “Add to progression”.</li>';
+  $('history').innerHTML = items.join('') || '<li class="empty">No chords yet. Choose a bass and figures, then press “Add to score”.</li>';
 
   $('undo').disabled = state.progression.length === 0;
   $('clear-all').disabled = state.progression.length === 0;
@@ -1164,10 +1192,14 @@ function bind() {
   $('new-keysig').addEventListener('change', (e) => setInput({ newKeySig: e.target.checked }));
   onButton('bass-letters', (b) => setInput({ bassLetter: Number(b.dataset.letter) }));
   onButton('bass-acc', (b) => setInput({ bassAcc: b.dataset.value === 'key' ? 'key' : Number(b.dataset.value) }));
-  onButton('figure-buttons', (b) => {
+  const pickFigure = (b) => {
     setInput({ figures: b.dataset.fig, rest: false });
     if (state.settings.quickAdd) commit();
-  });
+  };
+  onButton('figure-buttons', pickFigure);
+  onButton('figure-more', pickFigure);
+  $('fig-more').addEventListener('click', () => { state.settings.moreFigures = !state.settings.moreFigures; update(); });
+  onButton('tabs', (b) => { state.settings.tab = b.dataset.tab; save(); renderTabs(); });
   $('quick-add').addEventListener('change', (e) => { state.settings.quickAdd = e.target.checked; update(); });
   $('figures').addEventListener('input', (e) => setInput({ figures: e.target.value }));
   $('figures').addEventListener('keydown', (e) => {
@@ -1222,11 +1254,6 @@ function bind() {
   $('qe-bass-up').addEventListener('click', () => { stepBass(1); saveEdit(); });
   $('qe-bass-down').addEventListener('click', () => { stepBass(-1); saveEdit(); });
 
-  $('exercises-toggle').addEventListener('click', () => {
-    const panel = $('exercises');
-    panel.hidden = !panel.hidden;
-    $('exercises-toggle').setAttribute('aria-expanded', String(!panel.hidden));
-  });
   $('exercise-name').addEventListener('input', (e) => { state.exerciseName = e.target.value; save(); renderExercises(); });
   $('exercise-new').addEventListener('click', () => newExercise(`Exercise ${exercises.length + 1}`));
   $('exercise-duplicate').addEventListener('click', () => newExercise(`${state.exerciseName} (copy)`, JSON.parse(JSON.stringify(exerciseData()))));
@@ -1334,11 +1361,6 @@ function bind() {
   $('pickup').addEventListener('change', (e) => { state.score.pickup = Number(e.target.value); update(); });
   $('score-key').addEventListener('change', (e) => { state.score.keySig = e.target.value; update(); });
 
-  $('settings-toggle').addEventListener('click', () => {
-    const panel = $('settings');
-    panel.hidden = !panel.hidden;
-    $('settings-toggle').setAttribute('aria-expanded', String(!panel.hidden));
-  });
   onButton('names-choice', (b) => { state.settings.names = b.dataset.value; update(); });
   $('auto-raise').addEventListener('change', (e) => { state.settings.autoRaise = e.target.checked; update(); });
   $('part-toggles').addEventListener('change', (e) => {
@@ -1347,7 +1369,6 @@ function bind() {
     state.settings.show[k] = e.target.checked;
     if (k === 'practice' && !e.target.checked) state.practice.on = false;
     if (k === 'sound' && !e.target.checked) sound.stop();
-    if (k === 'exercises' && !e.target.checked) { $('exercises').hidden = true; $('exercises-toggle').setAttribute('aria-expanded', 'false'); }
     update();
   });
 
