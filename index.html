@@ -6,146 +6,205 @@
   <title>Figured Bass Decoder</title>
   <meta name="description" content="Enter a bass note, key and figures: get the chord, its notes, Roman numeral and a four-part voicing.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext x='4' y='26' font-size='26'%3E%F0%9D%84%A2%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <header class="topbar">
     <h1>Figured Bass Decoder</h1>
-    <div class="row tight">
-      <button id="exercises-toggle" class="icon-btn" data-part="exercises" aria-expanded="false" aria-controls="exercises">Exercises</button>
-      <button id="settings-toggle" class="icon-btn" aria-expanded="false" aria-controls="settings">Settings</button>
-    </div>
+    <span class="topbar-ex" id="topbar-ex"></span>
   </header>
 
-  <section id="exercises" class="panel settings exercises" data-part="exercises" hidden aria-label="Exercises">
-    <div class="row">
-      <label class="field-inline grow">
-        <span class="label">Current exercise</span>
-        <input id="exercise-name" type="text" autocomplete="off" placeholder="Untitled exercise">
-      </label>
-      <button id="exercise-new" class="ghost">New</button>
-      <button id="exercise-duplicate" class="ghost">Duplicate</button>
-    </div>
-    <div>
-      <span class="label">Saved in this browser</span>
-      <ul id="exercise-list" class="exercise-list"></ul>
-    </div>
-    <div class="row">
-      <button id="exercise-export" class="ghost">Export file…</button>
-      <button id="exercise-import-btn" class="ghost">Import file…</button>
-      <input id="exercise-import" type="file" accept=".json,application/json" hidden>
-    </div>
-    <p class="hint">Exercises save automatically as you work. Export a file to keep a copy or open it on another device.</p>
-  </section>
-
-  <section id="settings" class="panel settings" hidden>
-    <div class="field">
-      <span class="label">Note names</span>
-      <div class="segmented" id="names-choice" role="radiogroup" aria-label="Note names">
-        <button data-value="english" role="radio">English (C♯, B♭, B)</button>
-        <button data-value="german" role="radio">German (Cis, B, H)</button>
-        <button data-value="dutch" role="radio">Dutch (Cis, Bes, B)</button>
-      </div>
-    </div>
-    <label class="check">
-      <input type="checkbox" id="auto-raise">
-      Raise leading tone in minor automatically (V and V7 without a written ♯)
-    </label>
-    <div class="field">
-      <span class="label">Show in the app</span>
-      <div class="part-toggles" id="part-toggles"></div>
-      <p class="hint">The key, bass note and figures, the result and the progression score are always shown.</p>
-    </div>
-  </section>
-
   <main class="layout">
-    <section class="panel input-panel" aria-label="Input">
-      <div class="edit-banner" id="edit-banner" hidden>
-        <span id="edit-text"></span>
-        <div class="row tight">
-          <button id="insert-before" class="ghost">Insert before</button>
-          <button id="delete-chord" class="ghost danger">Delete</button>
-        </div>
-      </div>
-      <div class="field">
-        <span class="label">Key</span>
-        <div class="row">
-          <select id="key-tonic" aria-label="Key tonic"></select>
-          <div class="segmented" id="key-mode" role="radiogroup" aria-label="Mode">
-            <button data-value="major" role="radio">Major</button>
-            <button data-value="minor" role="radio">Minor</button>
+    <section class="panel input-panel strip" aria-label="Current chord">
+      <div class="strip-col col-bass">
+        <div class="field">
+          <span class="label">Key</span>
+          <div class="row">
+            <select id="key-tonic" aria-label="Key tonic"></select>
+            <div class="segmented" id="key-mode" role="radiogroup" aria-label="Mode">
+              <button data-value="major" role="radio">Major</button>
+              <button data-value="minor" role="radio">Minor</button>
+            </div>
           </div>
+          <label class="check keysig-row" id="keysig-row" hidden>
+            <input type="checkbox" id="new-keysig">
+            <span>The key changes here: print a new key signature in the score</span>
+          </label>
         </div>
-        <label class="check keysig-row" id="keysig-row" hidden>
-          <input type="checkbox" id="new-keysig">
-          <span>The key changes here: print a new key signature in the score</span>
-        </label>
-      </div>
 
-      <div class="field">
-        <span class="label">Bass note</span>
-        <div class="note-grid" id="bass-letters"></div>
-        <div class="row bass-row">
-          <div class="segmented small" id="bass-acc" role="radiogroup" aria-label="Bass accidental">
-            <button data-value="key" role="radio" title="As in the key signature">Key sig.</button>
-            <button data-value="-1" role="radio">♭</button>
-            <button data-value="0" role="radio">♮</button>
-            <button data-value="1" role="radio">♯</button>
-          </div>
-          <div class="octave-ctl" data-part="octave" role="group" aria-label="Bass octave">
-            <button id="octave-down" title="Bass an octave lower">↓ 8va</button>
-            <span id="octave-label" class="octave-label" aria-live="polite"></span>
-            <button id="octave-up" title="Bass an octave higher">↑ 8va</button>
-            <button id="octave-auto" class="ghost" title="Let the app choose the octave">Auto</button>
+        <div class="field">
+          <span class="label">Bass note</span>
+          <div class="note-grid" id="bass-letters"></div>
+          <div class="row bass-row">
+            <div class="segmented small" id="bass-acc" role="radiogroup" aria-label="Bass accidental">
+              <button data-value="key" role="radio" title="As in the key signature">Key sig.</button>
+              <button data-value="-1" role="radio">♭</button>
+              <button data-value="0" role="radio">♮</button>
+              <button data-value="1" role="radio">♯</button>
+            </div>
+            <div class="octave-ctl" data-part="octave" role="group" aria-label="Bass octave">
+              <button id="octave-down" title="Bass an octave lower">↓ 8va</button>
+              <span id="octave-label" class="octave-label" aria-live="polite"></span>
+              <button id="octave-up" title="Bass an octave higher">↑ 8va</button>
+              <button id="octave-auto" class="ghost" title="Let the app choose the octave">Auto</button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="field">
-        <label class="label" for="figures">Figures</label>
-        <div class="figure-buttons" id="figure-buttons" data-part="figureButtons"></div>
-        <label class="check quick-add" data-part="figureButtons">
-          <input type="checkbox" id="quick-add">
-          <span>Quick add: tapping a figure adds the chord straight away</span>
-        </label>
-        <div class="row">
-          <input id="figures" type="text" inputmode="text" autocomplete="off" spellcheck="false"
-                 placeholder="blank, or e.g. 6/5, #6 4 3, 7 #, 4-3">
-          <button id="clear-figures" class="ghost" title="Clear figures">✕</button>
-          <button id="suggest-figures" class="ghost" data-part="figureButtons" title="Suggest figures with the Rule of the Octave">Suggest</button>
+      <div class="strip-col col-fig">
+        <div class="field fig-field">
+          <div class="fig-head">
+            <label class="label" for="figures">Figures</label>
+            <details class="help" data-part="figureHelp">
+              <summary>How to type figures</summary>
+              <ul>
+                <li>Leave the figures blank for an unfigured bass: it means a root-position chord, and nothing is printed under the note. Type <code>5/3</code> if you want it printed.</li>
+                <li>Stack figures with spaces or <code>/</code>: <code>6 4</code>, <code>6/5</code>, <code>4/3</code>, <code>4 2</code>. Missing ones are filled in: <code>6</code> = 6/3, <code>7</code> = 7/5/3.</li>
+                <li>A lone <code>#</code>, <code>b</code> or <code>n</code> (♮) changes the 3rd above the bass.</li>
+                <li>Accidentals on a figure: <code>#6</code>, <code>b7</code>, <code>n6</code>, or after it: <code>6#</code>, <code>6+</code>, <code>6\</code> (slashed).</li>
+                <li>A sharp raises the note in the key signature by a half step, so in F major <code>#</code> above G turns B♭ into B♮.</li>
+                <li>Use <code>-</code> for figures that follow each other over one bass: <code>4-3</code>, <code>9-8</code>, <code>7-6</code>, <code>6/4-5/3</code>.</li>
+              </ul>
+            </details>
+          </div>
+          <div class="row fig-input-row">
+            <input id="figures" type="text" inputmode="text" autocomplete="off" spellcheck="false"
+                   placeholder="blank, or e.g. 6/5, #6 4 3, 7 #, 4-3">
+            <button id="clear-figures" class="ghost" title="Clear figures">✕</button>
+            <button id="suggest-figures" class="ghost" data-part="figureButtons" title="Suggest figures with the Rule of the Octave">Suggest</button>
+          </div>
+          <div class="fig-row" data-part="figureButtons">
+            <div class="figure-buttons" id="figure-buttons"></div>
+            <button id="fig-more" class="ghost fig-more" aria-expanded="false" aria-controls="figure-more" title="Show the less common figures">More ▾</button>
+          </div>
+          <div class="figure-buttons figure-more" id="figure-more" data-part="figureButtons" role="group" aria-label="More figures" hidden></div>
+          <label class="check quick-add" data-part="figureButtons">
+            <input type="checkbox" id="quick-add">
+            <span>Quick add: tapping a figure adds the chord straight away</span>
+          </label>
         </div>
-        <details class="help" data-part="figureHelp">
-          <summary>How to type figures</summary>
-          <ul>
-            <li>Leave the figures blank for an unfigured bass: it means a root-position chord, and nothing is printed under the note. Type <code>5/3</code> if you want it printed.</li>
-            <li>Stack figures with spaces or <code>/</code>: <code>6 4</code>, <code>6/5</code>, <code>4/3</code>, <code>4 2</code>. Missing ones are filled in: <code>6</code> = 6/3, <code>7</code> = 7/5/3.</li>
-            <li>A lone <code>#</code>, <code>b</code> or <code>n</code> (♮) changes the 3rd above the bass.</li>
-            <li>Accidentals on a figure: <code>#6</code>, <code>b7</code>, <code>n6</code>, or after it: <code>6#</code>, <code>6+</code>, <code>6\</code> (slashed).</li>
-            <li>A sharp raises the note in the key signature by a half step, so in F major <code>#</code> above G turns B♭ into B♮.</li>
-            <li>Use <code>-</code> for figures that follow each other over one bass: <code>4-3</code>, <code>9-8</code>, <code>7-6</code>, <code>6/4-5/3</code>.</li>
-          </ul>
+
+        <div class="field" data-part="noteValues">
+          <span class="label">Note value</span>
+          <div class="row">
+            <div class="segmented" id="duration-choice" role="radiogroup" aria-label="Note value">
+              <button data-value="8" role="radio" title="Eighth note"></button>
+              <button data-value="q" role="radio" title="Quarter note"></button>
+              <button data-value="h" role="radio" title="Half note"></button>
+            </div>
+            <button id="rest-toggle" class="toggle" aria-pressed="false" title="A rest in all voices instead of a chord">Rest</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="strip-col col-result">
+        <div class="edit-banner" id="edit-banner" hidden>
+          <span id="edit-text"></span>
+          <div class="row tight">
+            <button id="insert-before" class="ghost">Insert before</button>
+            <button id="delete-chord" class="ghost danger">Delete</button>
+          </div>
+        </div>
+        <div class="strip-eyebrow" id="strip-eyebrow">Current chord</div>
+        <div id="result" class="result" aria-live="polite"></div>
+        <div class="actions">
+          <button id="add-chord" class="primary"><span id="add-label">Add to score</span> <kbd>Enter</kbd></button>
+          <button id="cancel-edit" class="ghost" hidden>Cancel</button>
+        </div>
+      </div>
+    </section>
+
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
+      <button role="tab" data-tab="score">Score</button>
+      <button role="tab" data-tab="voicing" data-part="voicePanel">Voicing</button>
+      <button role="tab" data-tab="keyboard" data-part="keyboard">Keyboard</button>
+      <button role="tab" data-tab="line" data-part="lineEntry">Bass line</button>
+      <button role="tab" data-tab="exercises" data-part="exercises">Exercises</button>
+      <button role="tab" data-tab="settings">Settings</button>
+      <span class="tabs-title" aria-hidden="true">Figured Bass Decoder · <span id="tabs-ex"></span></span>
+    </nav>
+
+    <div class="tab-panels">
+      <section class="panel progression-panel" data-tab-panel="score" aria-label="Score">
+        <div class="panel-head">
+          <h2>Score</h2>
+          <div class="row tight">
+            <button id="print-btn" class="ghost" data-part="print" title="Print the score and analysis, or save them as PDF">Print / PDF</button>
+            <button id="practice-toggle" class="toggle" data-part="practice" aria-pressed="false" title="Write the upper voices yourself and check them">Practice</button>
+            <button id="undo" class="ghost">Undo</button>
+            <button id="clear-all" class="ghost danger">Clear</button>
+          </div>
+        </div>
+        <div class="player" id="player" data-part="sound" role="group" aria-label="Play the harmony">
+          <button id="play-btn" class="primary play-btn" title="Play the whole harmony (Space)">▶ Play</button>
+          <div class="segmented voice-toggles" id="voice-toggles" aria-label="Voices to hear"></div>
+          <button id="loop-toggle" class="toggle" aria-pressed="false" title="Start again at the end">⟲ Loop</button>
+          <span class="tempo" title="Tempo: 72 quarter notes per minute">72 bpm</span>
+        </div>
+        <details class="score-settings" id="score-settings" data-part="scoreSettings">
+          <summary>Score settings: <span id="score-summary"></span></summary>
+          <div class="score-grid">
+            <label class="field-inline">
+              <span class="label">Time signature</span>
+              <select id="time-sig">
+                <option value="2/4">2/4</option>
+                <option value="3/4">3/4</option>
+                <option value="4/4">4/4</option>
+                <option value="2/2">2/2 (alla breve)</option>
+                <option value="3/8">3/8</option>
+                <option value="6/8">6/8</option>
+                <option value="custom">Custom…</option>
+              </select>
+            </label>
+            <div class="field-inline" id="custom-time" hidden>
+              <span class="label">Custom</span>
+              <div class="row tight">
+                <input id="time-num" type="number" min="1" max="16" aria-label="Beats per bar">
+                <span>/</span>
+                <select id="time-den" aria-label="Beat unit">
+                  <option value="2">2</option>
+                  <option value="4">4</option>
+                  <option value="8">8</option>
+                </select>
+              </div>
+            </div>
+            <label class="field-inline">
+              <span class="label">Pickup (upbeat)</span>
+              <select id="pickup"></select>
+            </label>
+            <label class="field-inline">
+              <span class="label">Key signature at the start</span>
+              <select id="score-key"></select>
+            </label>
+          </div>
+          <p class="hint">Tap a chord in the score or in the list below to edit it.</p>
         </details>
-      </div>
+        <div class="staff-wrap"><div id="staff"></div></div>
+        <ol id="history" class="history"></ol>
+      </section>
 
-      <div class="field" data-part="noteValues">
-        <span class="label">Note value</span>
-        <div class="row">
-          <div class="segmented" id="duration-choice" role="radiogroup" aria-label="Note value">
-            <button data-value="8" role="radio" title="Eighth note"></button>
-            <button data-value="q" role="radio" title="Quarter note"></button>
-            <button data-value="h" role="radio" title="Half note"></button>
+      <section class="panel voice-panel" id="voice-panel" data-tab-panel="voicing" aria-label="Voice leading">
+        <div class="panel-head" data-part="voicePanel">
+          <h2 id="vl-title">Voice leading</h2>
+          <div class="row tight">
+            <button id="hear-chord" class="ghost" data-part="sound" title="Play this chord">▶ Hear</button>
+            <button id="next-voicing" class="ghost">Try another voicing ↻</button>
           </div>
-          <button id="rest-toggle" class="toggle" aria-pressed="false" title="A rest in all voices instead of a chord">Rest</button>
         </div>
-      </div>
+        <div id="voice-leading" data-part="voicePanel"></div>
+      </section>
 
-      <div class="actions">
-        <button id="add-chord" class="primary"><span id="add-label">Add to progression</span> <kbd>Enter</kbd></button>
-        <button id="cancel-edit" class="ghost" hidden>Cancel</button>
-      </div>
+      <section class="panel keyboard-panel" data-part="keyboard" data-tab-panel="keyboard" aria-label="Keyboard">
+        <h2>Keyboard</h2>
+        <div id="keyboard" class="keyboard-wrap"></div>
+      </section>
 
-      <details class="line-entry" id="line-entry" data-part="lineEntry">
-        <summary>Type a whole bass line</summary>
+      <section class="panel line-panel" id="line-entry" data-part="lineEntry" data-tab-panel="line" aria-label="Type a bass line">
+        <h2>Type a whole bass line</h2>
         <textarea id="line-text" rows="3" spellcheck="false" autocomplete="off"
                   placeholder="C  D:6/4/3  E:6  F:6/5  G/h:6/4-5/3  C/h"></textarea>
         <div id="line-preview" class="line-preview" aria-live="polite"></div>
@@ -158,82 +217,52 @@
           <li>Octave: <code>C2</code>, <code>G3</code>. Note value: <code>/8</code>, <code>/q</code>, <code>/h</code> (otherwise the selected value).</li>
           <li>Figures after a colon, with <code>/</code> or <code>,</code> between them: <code>D:6/4/3</code>, <code>E:7,#</code>, <code>G/h:6/4-5/3</code>. Rest: <code>r</code> or <code>r/h</code>.</li>
         </ul>
-      </details>
-    </section>
+      </section>
 
-    <section class="panel result-panel" aria-live="polite" aria-label="Result">
-      <div id="result"></div>
-    </section>
-
-    <section class="panel voice-panel" id="voice-panel" aria-label="Voice leading">
-      <div class="panel-head" data-part="voicePanel">
-        <h2 id="vl-title">Voice leading</h2>
-        <div class="row tight">
-          <button id="hear-chord" class="ghost" data-part="sound" title="Play this chord">▶ Hear</button>
-          <button id="next-voicing" class="ghost">Try another voicing ↻</button>
-        </div>
-      </div>
-      <div id="voice-leading" data-part="voicePanel"></div>
-      <div id="keyboard" class="keyboard-wrap" data-part="keyboard"></div>
-    </section>
-
-    <section class="panel progression-panel" aria-label="Progression">
-      <div class="panel-head">
-        <h2>Progression</h2>
-        <div class="row tight">
-          <button id="print-btn" class="ghost" data-part="print" title="Print the score and analysis, or save them as PDF">Print / PDF</button>
-          <button id="practice-toggle" class="toggle" data-part="practice" aria-pressed="false" title="Write the upper voices yourself and check them">Practice</button>
-          <button id="undo" class="ghost">Undo</button>
-          <button id="clear-all" class="ghost danger">Clear</button>
-        </div>
-      </div>
-      <div class="player" id="player" data-part="sound" role="group" aria-label="Play the harmony">
-        <button id="play-btn" class="primary play-btn" title="Play the whole harmony (Space)">▶ Play</button>
-        <div class="segmented voice-toggles" id="voice-toggles" aria-label="Voices to hear"></div>
-        <button id="loop-toggle" class="toggle" aria-pressed="false" title="Start again at the end">⟲ Loop</button>
-        <span class="tempo" title="Tempo: 72 quarter notes per minute">72 bpm</span>
-      </div>
-      <details class="score-settings" id="score-settings" data-part="scoreSettings">
-        <summary>Score settings: <span id="score-summary"></span></summary>
-        <div class="score-grid">
-          <label class="field-inline">
-            <span class="label">Time signature</span>
-            <select id="time-sig">
-              <option value="2/4">2/4</option>
-              <option value="3/4">3/4</option>
-              <option value="4/4">4/4</option>
-              <option value="2/2">2/2 (alla breve)</option>
-              <option value="3/8">3/8</option>
-              <option value="6/8">6/8</option>
-              <option value="custom">Custom…</option>
-            </select>
+      <section id="exercises" class="panel exercises" data-part="exercises" data-tab-panel="exercises" aria-label="Exercises">
+        <h2>Exercises</h2>
+        <div class="row">
+          <label class="field-inline grow">
+            <span class="label">Current exercise</span>
+            <input id="exercise-name" type="text" autocomplete="off" placeholder="Untitled exercise">
           </label>
-          <div class="field-inline" id="custom-time" hidden>
-            <span class="label">Custom</span>
-            <div class="row tight">
-              <input id="time-num" type="number" min="1" max="16" aria-label="Beats per bar">
-              <span>/</span>
-              <select id="time-den" aria-label="Beat unit">
-                <option value="2">2</option>
-                <option value="4">4</option>
-                <option value="8">8</option>
-              </select>
-            </div>
+          <button id="exercise-new" class="ghost">New</button>
+          <button id="exercise-duplicate" class="ghost">Duplicate</button>
+        </div>
+        <div>
+          <span class="label">Saved in this browser</span>
+          <ul id="exercise-list" class="exercise-list"></ul>
+        </div>
+        <div class="row">
+          <button id="exercise-export" class="ghost">Export file…</button>
+          <button id="exercise-import-btn" class="ghost">Import file…</button>
+          <input id="exercise-import" type="file" accept=".json,application/json" hidden>
+        </div>
+        <p class="hint">Exercises save automatically as you work. Export a file to keep a copy or open it on another device.</p>
+      </section>
+
+      <section id="settings" class="panel settings" data-tab-panel="settings" aria-label="Settings">
+        <h2>Settings</h2>
+        <div class="field">
+          <span class="label">Note names</span>
+          <div class="segmented" id="names-choice" role="radiogroup" aria-label="Note names">
+            <button data-value="english" role="radio">English (C♯, B♭, B)</button>
+            <button data-value="german" role="radio">German (Cis, B, H)</button>
+            <button data-value="dutch" role="radio">Dutch (Cis, Bes, B)</button>
           </div>
-          <label class="field-inline">
-            <span class="label">Pickup (upbeat)</span>
-            <select id="pickup"></select>
-          </label>
-          <label class="field-inline">
-            <span class="label">Key signature at the start</span>
-            <select id="score-key"></select>
-          </label>
         </div>
-        <p class="hint">Tap a chord in the score or in the list below to edit it.</p>
-      </details>
-      <div class="staff-wrap"><div id="staff"></div></div>
-      <ol id="history" class="history"></ol>
-    </section>
+        <label class="check">
+          <input type="checkbox" id="auto-raise">
+          Raise leading tone in minor automatically (V and V7 without a written ♯)
+        </label>
+        <div class="field">
+          <span class="label">Show in the app</span>
+          <div class="part-toggles" id="part-toggles"></div>
+          <p class="hint">The key, bass note and figures, the result and the progression score are always shown.</p>
+        </div>
+        <p class="hint settings-credit">Notation by <a href="https://www.vexflow.com/">VexFlow</a>. Voicings follow chorale-style four-part rules; treat them as suggestions.</p>
+      </section>
+    </div>
   </main>
 
   <section id="quick-edit" class="quick-edit" hidden aria-label="Quick edit">
