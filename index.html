@@ -12,12 +12,12 @@
   <header class="topbar">
     <h1>Figured Bass Decoder</h1>
     <div class="row tight">
-      <button id="exercises-toggle" class="icon-btn" aria-expanded="false" aria-controls="exercises">Exercises</button>
+      <button id="exercises-toggle" class="icon-btn" data-part="exercises" aria-expanded="false" aria-controls="exercises">Exercises</button>
       <button id="settings-toggle" class="icon-btn" aria-expanded="false" aria-controls="settings">Settings</button>
     </div>
   </header>
 
-  <section id="exercises" class="panel settings exercises" hidden aria-label="Exercises">
+  <section id="exercises" class="panel settings exercises" data-part="exercises" hidden aria-label="Exercises">
     <div class="row">
       <label class="field-inline grow">
         <span class="label">Current exercise</span>
@@ -51,6 +51,11 @@
       <input type="checkbox" id="auto-raise">
       Raise leading tone in minor automatically (V and V7 without a written ♯)
     </label>
+    <div class="field">
+      <span class="label">Show in the app</span>
+      <div class="part-toggles" id="part-toggles"></div>
+      <p class="hint">The key, bass note and figures, the result and the progression score are always shown.</p>
+    </div>
   </section>
 
   <main class="layout">
@@ -87,7 +92,7 @@
             <button data-value="0" role="radio">♮</button>
             <button data-value="1" role="radio">♯</button>
           </div>
-          <div class="octave-ctl" role="group" aria-label="Bass octave">
+          <div class="octave-ctl" data-part="octave" role="group" aria-label="Bass octave">
             <button id="octave-down" title="Bass an octave lower">↓ 8va</button>
             <span id="octave-label" class="octave-label" aria-live="polite"></span>
             <button id="octave-up" title="Bass an octave higher">↑ 8va</button>
@@ -98,14 +103,18 @@
 
       <div class="field">
         <label class="label" for="figures">Figures</label>
-        <div class="figure-buttons" id="figure-buttons"></div>
+        <div class="figure-buttons" id="figure-buttons" data-part="figureButtons"></div>
+        <label class="check quick-add" data-part="figureButtons">
+          <input type="checkbox" id="quick-add">
+          <span>Quick add: tapping a figure adds the chord straight away</span>
+        </label>
         <div class="row">
           <input id="figures" type="text" inputmode="text" autocomplete="off" spellcheck="false"
                  placeholder="blank, or e.g. 6/5, #6 4 3, 7 #, 4-3">
           <button id="clear-figures" class="ghost" title="Clear figures">✕</button>
-          <button id="suggest-figures" class="ghost" title="Suggest figures with the Rule of the Octave">Suggest</button>
+          <button id="suggest-figures" class="ghost" data-part="figureButtons" title="Suggest figures with the Rule of the Octave">Suggest</button>
         </div>
-        <details class="help">
+        <details class="help" data-part="figureHelp">
           <summary>How to type figures</summary>
           <ul>
             <li>Leave the figures blank for an unfigured bass: it means a root-position chord, and nothing is printed under the note. Type <code>5/3</code> if you want it printed.</li>
@@ -118,7 +127,7 @@
         </details>
       </div>
 
-      <div class="field">
+      <div class="field" data-part="noteValues">
         <span class="label">Note value</span>
         <div class="row">
           <div class="segmented" id="duration-choice" role="radiogroup" aria-label="Note value">
@@ -135,7 +144,7 @@
         <button id="cancel-edit" class="ghost" hidden>Cancel</button>
       </div>
 
-      <details class="line-entry" id="line-entry">
+      <details class="line-entry" id="line-entry" data-part="lineEntry">
         <summary>Type a whole bass line</summary>
         <textarea id="line-text" rows="3" spellcheck="false" autocomplete="off"
                   placeholder="C  D:6/4/3  E:6  F:6/5  G/h:6/4-5/3  C/h"></textarea>
@@ -156,26 +165,35 @@
       <div id="result"></div>
     </section>
 
-    <section class="panel voice-panel" aria-label="Voice leading">
-      <div class="panel-head">
+    <section class="panel voice-panel" id="voice-panel" aria-label="Voice leading">
+      <div class="panel-head" data-part="voicePanel">
         <h2 id="vl-title">Voice leading</h2>
-        <button id="next-voicing" class="ghost">Try another voicing ↻</button>
+        <div class="row tight">
+          <button id="hear-chord" class="ghost" data-part="sound" title="Play this chord">▶ Hear</button>
+          <button id="next-voicing" class="ghost">Try another voicing ↻</button>
+        </div>
       </div>
-      <div id="voice-leading"></div>
-      <div id="keyboard" class="keyboard-wrap"></div>
+      <div id="voice-leading" data-part="voicePanel"></div>
+      <div id="keyboard" class="keyboard-wrap" data-part="keyboard"></div>
     </section>
 
     <section class="panel progression-panel" aria-label="Progression">
       <div class="panel-head">
         <h2>Progression</h2>
         <div class="row tight">
-          <button id="print-btn" class="ghost" title="Print the score and analysis, or save them as PDF">Print / PDF</button>
-          <button id="practice-toggle" class="toggle" aria-pressed="false" title="Write the upper voices yourself and check them">Practice</button>
+          <button id="print-btn" class="ghost" data-part="print" title="Print the score and analysis, or save them as PDF">Print / PDF</button>
+          <button id="practice-toggle" class="toggle" data-part="practice" aria-pressed="false" title="Write the upper voices yourself and check them">Practice</button>
           <button id="undo" class="ghost">Undo</button>
           <button id="clear-all" class="ghost danger">Clear</button>
         </div>
       </div>
-      <details class="score-settings" id="score-settings">
+      <div class="player" id="player" data-part="sound" role="group" aria-label="Play the harmony">
+        <button id="play-btn" class="primary play-btn" title="Play the whole harmony (Space)">▶ Play</button>
+        <div class="segmented voice-toggles" id="voice-toggles" aria-label="Voices to hear"></div>
+        <button id="loop-toggle" class="toggle" aria-pressed="false" title="Start again at the end">⟲ Loop</button>
+        <span class="tempo" title="Tempo: 72 quarter notes per minute">72 bpm</span>
+      </div>
+      <details class="score-settings" id="score-settings" data-part="scoreSettings">
         <summary>Score settings: <span id="score-summary"></span></summary>
         <div class="score-grid">
           <label class="field-inline">
@@ -217,6 +235,22 @@
       <ol id="history" class="history"></ol>
     </section>
   </main>
+
+  <section id="quick-edit" class="quick-edit" hidden aria-label="Quick edit">
+    <div class="qe-head">
+      <button id="qe-prev" class="ghost" title="Previous chord">◀</button>
+      <span id="qe-title" class="qe-title"></span>
+      <button id="qe-next" class="ghost" title="Next chord">▶</button>
+      <button id="qe-close" class="ghost" title="Close (Esc)">Done</button>
+    </div>
+    <div class="qe-bass">
+      <button id="qe-bass-down" class="ghost" title="Bass a step lower">Bass ↓</button>
+      <button id="qe-bass-up" class="ghost" title="Bass a step higher">Bass ↑</button>
+      <button id="qe-hear" class="ghost" data-part="sound" title="Play this chord">▶ Hear</button>
+      <button id="qe-delete" class="ghost danger">Delete</button>
+    </div>
+    <div class="figure-buttons qe-figures" id="qe-figures"></div>
+  </section>
 
   <section id="print-view" class="print-view" aria-hidden="true"></section>
 

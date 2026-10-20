@@ -304,6 +304,7 @@ body.practicing .input-panel .primary { opacity: .9; }
 .print-view th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #555; }
 .print-view .fig { font-family: Georgia, serif; white-space: nowrap; }
 .print-view .print-foot { margin-top: 12px; font-size: 10px; color: #777; }
+.print-view .print-analysis h2 { font-size: 16px; margin: 0 0 8px; }
 
 @media print {
   @page { margin: 14mm; }
@@ -312,4 +313,51 @@ body.practicing .input-panel .primary { opacity: .9; }
   .print-view, .print-view.preparing { display: block; position: static; width: auto; }
   .print-view .print-staff svg { width: 100%; height: auto; }
   .print-view tr { break-inside: avoid; }
+  /* Page 1 holds only the score; the analysis starts on its own page. */
+  .print-view .print-analysis { break-before: page; page-break-before: always; }
+}
+
+/* Settings: parts that can be hidden */
+.part-off { display: none !important; }
+.part-toggles { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 16px; }
+@media (min-width: 960px) {
+  body.no-voice-panel .layout { grid-template-areas: "input result" "input result" "prog prog"; }
+}
+.quick-add { margin: 0 0 8px; font-size: .9rem; color: var(--muted); }
+.quick-add input { margin-top: 2px; }
+
+/* Sound */
+.player { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.player .play-btn { width: auto; min-width: 104px; }
+.voice-toggles button { min-width: 46px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+.voice-toggles button[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
+.voice-toggles button[aria-pressed="false"] .dot { opacity: .3; }
+.voice-toggles button[aria-pressed="true"] { background: var(--accent-soft); }
+.tempo { color: var(--muted); font-family: var(--serif); }
+.history button.playing { border-color: #2f7d3a; background: color-mix(in srgb, #2f7d3a 14%, transparent); }
+
+/* Quick edit */
+.quick-edit {
+  position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 20;
+  width: min(620px, calc(100% - 24px)); max-height: 60vh; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--accent); border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .18); padding: 10px 12px;
+}
+.quick-edit[hidden] { display: none; }
+.qe-head, .qe-bass { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.qe-title { flex: 1; min-width: 0; font-weight: 600; text-align: center; }
+.qe-bass button { flex: 1; min-width: 72px; }
+.qe-figures { margin-bottom: 0; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); }
+.qe-figures button { min-height: 46px; }
+body.quick-editing .footer { padding-bottom: 300px; }
+
+/* Phone: bigger targets and the Add button always in reach */
+@media (max-width: 600px) {
+  .note-grid button { min-height: 50px; font-size: 1.2rem; }
+  .figure-buttons { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .figure-buttons button { min-height: 54px; font-size: 1.05rem; }
+  .actions { position: sticky; bottom: 0; z-index: 5; background: var(--panel); padding: 8px 0; margin: 0 -4px; }
+  .actions .primary { min-height: 50px; }
+  .quick-edit { bottom: 0; width: 100%; border-radius: var(--radius) var(--radius) 0 0; border-bottom: 0; }
+  .qe-figures { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }

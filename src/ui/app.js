@@ -9,14 +9,32 @@ import { suggestFigures } from '../theory/rule.js';
 import { buildVoices, layoutBars, barTicks, DURATION_TICKS, DURATION_NAMES } from '../theory/score.js';
 import { renderScore } from './staff.js';
 import { renderKeyboard, VOICE_COLORS } from './keyboard.js';
+import { playbackNotes } from '../theory/playback.js';
+import * as sound from './sound.js';
 
 const STORAGE_KEY = 'figured-bass-decoder:v1';
 const EXERCISES_KEY = 'figured-bass-decoder:exercises';
 const MAX_ALTERNATIVES = 8;
 const PREVIEW_COLOR = '#b0601e';
 const EDIT_COLOR = '#1d5fa8';
+const PLAY_COLOR = '#2f7d3a';
 
 const FIGURE_BUTTONS = ['', '5/3', '6', '6/4', '7', '6/5', '4/3', '4/2', '#', 'b', 'n', '7 #', '#6', '4-3', '9-8', '7-6', '6/4-5/3'];
+// Parts of the page that can be switched off in Settings (all on by default).
+const PARTS = [
+  ['octave', 'Bass octave controls'],
+  ['figureButtons', 'Figure buttons, Quick add and Suggest'],
+  ['figureHelp', 'How to type figures'],
+  ['noteValues', 'Note values and Rest'],
+  ['lineEntry', 'Type a whole bass line'],
+  ['voicePanel', 'Voice leading (SATB)'],
+  ['keyboard', 'Piano keyboard'],
+  ['sound', 'Sound: Play, voices and Loop'],
+  ['practice', 'Practice mode'],
+  ['scoreSettings', 'Score settings'],
+  ['print', 'Print / PDF'],
+  ['exercises', 'Exercises'],
+];
 const INPUT_FIELDS = ['tonic', 'mode', 'bassLetter', 'bassAcc', 'bassOctave', 'figures', 'duration', 'rest', 'newKeySig'];
 
 const defaults = () => ({
@@ -38,7 +56,13 @@ const defaults = () => ({
   exerciseId: null,
   exerciseName: 'Exercise 1',
   lineText: '',
-  settings: { names: 'english', autoRaise: false },
+  settings: {
+    names: 'english',
+    autoRaise: false,
+    quickAdd: false,
+    show: Object.fromEntries(PARTS.map(([k]) => [k, true])),
+    sound: { voices: [true, true, true, true], loop: false }, // voices: bass, tenor, alto, soprano
+  },
   score: { timeSig: '4/4', customNum: 5, customDen: 4, pickup: 0, keySig: 'auto' },
 });
 
@@ -50,7 +74,10 @@ function load() {
     if (!raw) return defaults();
     const saved = JSON.parse(raw);
     const d = defaults();
-    const s = { ...d, ...saved, settings: { ...d.settings, ...saved.settings }, score: { ...d.score, ...saved.score }, practice: { ...d.practice, ...saved.practice } };
+    const settings = { ...d.settings, ...saved.settings };
+    settings.show = { ...d.settings.show, ...saved.settings?.show };
+    settings.sound = { ...d.settings.sound, ...saved.settings?.sound };
+    const s = { ...d, ...saved, settings, score: { ...d.score, ...saved.score }, practice: { ...d.practice, ...saved.practice } };
     if (s.target?.type !== 'append' && !(s.target?.index < s.progression.length + (s.target?.type === 'insert' ? 1 : 0))) s.target = d.target;
     return s;
   } catch {
@@ -431,6 +458,7 @@ function renderControls() {
   setChecked('bass-acc', state.bassAcc);
   setChecked('duration-choice', state.duration);
   $('auto-raise').checked = state.settings.autoRaise;
+  $('quick-add').checked = state.settings.quickAdd;
 
   const before = keyBefore(targetIndex());
   const keyChanges = before && (before.tonic.letter !== key.tonic.letter || before.tonic.acc !== key.tonic.acc || before.mode !== key.mode);
@@ -482,6 +510,71 @@ function renderControls() {
     + KEY_SIGNATURES.map(([spec, label]) => `<option value="${spec}"${spec === state.score.keySig ? ' selected' : ''}>${esc(label)} (${esc(noteName(parseNote(spec), sys()))} major)</option>`).join('');
   $('score-key').value = state.score.keySig;
   $('score-summary').textContent = `${sig.num}/${sig.den}${state.score.pickup ? `, pickup ${ticksLabel(state.score.pickup)}` : ''}`;
+
+  renderParts();
+  renderPlayer();
+}
+
+/** Show or hide the optional parts of the page, as chosen in Settings. */
+function renderParts() {
+  const show = state.settings.show;
+  $('part-toggles').innerHTML = PARTS.map(([k, label]) => `<label class="check"><input type="checkbox" data-part-toggle="${k}"${show[k] ? ' checked' : ''}> ${esc(label)}</label>`).join('');
+  const practicing = state.practice.on;
+  for (const [k] of PARTS) {
+    const on = show[k] || (k === 'voicePanel' && practicing);
+    for (const el of document.querySelectorAll(`[data-part="${k}"]`)) el.classList.toggle('part-off', !on);
+  }
+  $('voice-panel').classList.toggle('part-off', !practicing && !show.voicePanel && !show.keyboard);
+  document.body.classList.toggle('no-voice-panel', !practicing && !show.voicePanel && !show.keyboard);
+}
+
+// ---------------------------------------------------------------- sound
+
+let playing = null; // { index: chord being played (stored progression), signature }
+
+function renderPlayer() {
+  const voices = state.settings.sound.voices;
+  $('voice-toggles').innerHTML = [3, 2, 1, 0].map((v) => `<button data-voice="${v}" aria-pressed="${voices[v]}" title="${voices[v] ? 'Mute' : 'Hear'} the ${VOICES[v].toLowerCase()}"><span class="dot" style="background:${VOICE_COLORS[v]}"></span>${VOICES[v][0]}</button>`).join('');
+  $('loop-toggle').setAttribute('aria-pressed', String(state.settings.sound.loop));
+  $('play-btn').textContent = playing ? '■ Stop' : '▶ Play';
+  $('play-btn').disabled = !playing && state.progression.length === 0;
+  $('play-btn').setAttribute('aria-pressed', String(!!playing));
+}
+
+/** Timed notes for the chords `from`..`to` of a voiced model. */
+function notesFor(model, from = 0, to = model.entries.length) {
+  const events = model.entries.slice(from, to).map((e, k) => ({ ticks: DURATION_TICKS[durationOf(e)], rest: !!e.rest, stages: model.voiced[from + k] }));
+  const timed = playbackNotes(buildVoices(events));
+  const shift = (x) => ({ ...x, event: x.event + from });
+  return { ...timed, notes: timed.notes.map(shift), events: timed.events.map(shift) };
+}
+
+function togglePlay() {
+  if (playing) { sound.stop(); return; }
+  if (!state.progression.length) return;
+  sound.setVoices(state.settings.sound.voices);
+  playing = { index: null, signature: JSON.stringify(state.progression) };
+  sound.play(notesFor(storedModel()), {
+    loop: () => state.settings.sound.loop,
+    onEvent: (i) => { if (playing) { playing.index = i; renderProgression(compute()); } },
+    onStop: () => { playing = null; renderPlayer(); renderProgression(compute()); },
+  });
+  renderPlayer();
+}
+
+/** Play the chord shown in the result panel (the input, or the chord being edited). */
+function hearChord() {
+  const model = compute();
+  const i = model.focus;
+  if (i === null || model.entries[i].rest || !model.voiced[i]?.[0]?.midis) return;
+  sound.setVoices(state.settings.sound.voices);
+  sound.play(notesFor(model, i, i + 1));
+}
+
+/** Index in the displayed model of a chord of the stored progression. */
+function displayIndex(i) {
+  const t = state.target;
+  return t.type === 'insert' && i >= t.index ? i + 1 : i;
 }
 
 function renderResult(model) {
@@ -746,6 +839,8 @@ function printScore() {
     <h1>${esc(state.exerciseName || 'Figured bass')}</h1>
     <p class="print-sub">${esc(keyName(firstKey, sys()))} · ${sig.num}/${sig.den}${practicing ? ' · your realization' : ''}</p>
     <div class="print-staff"><div id="print-staff"></div></div>
+    <section class="print-analysis">
+    <h2>Chord analysis${state.exerciseName ? `: ${esc(state.exerciseName)}` : ''}</h2>
     <table>
       <thead><tr><th>#</th><th>Bass</th><th>Figures</th><th>Chord</th><th>Notes</th><th>Numeral</th><th>Value</th></tr></thead>
       <tbody>${model.entries.map((e, i) => {
@@ -759,7 +854,8 @@ function printScore() {
         return `<tr><td>${i + 1}</td><td>${esc(bassNote ? pitchName(bassNote, sys()) : nn(e.bass))}</td><td class="fig">${esc(figs)}</td><td>${esc(name)}</td><td>${esc(notes)}</td><td class="fig">${esc(d.label)}</td><td>${value}</td></tr>`;
       }).join('')}</tbody>
     </table>
-    <p class="print-foot">Figured Bass Decoder · voicings follow chorale-style four-part rules.</p>`;
+    <p class="print-foot">Figured Bass Decoder · voicings follow chorale-style four-part rules.</p>
+    </section>`;
   view.classList.add('preparing');
   renderScore($('print-staff'), scoreFor(model, { showUser: practicing }));
   const svg = $('print-staff').querySelector('svg');
@@ -788,7 +884,9 @@ function renderProgression(model) {
     const order = ['ok', 'warn', 'error'];
     return steps.map(stepStatus).reduce((a, b) => (order.indexOf(b) > order.indexOf(a) ? b : a), 'ok');
   };
+  const playingAt = playing?.index != null ? displayIndex(playing.index) : null;
   const color = (i) => {
+    if (i === playingAt) return PLAY_COLOR;
     if (practice) return state.practice.checked && showUser ? STATUS_COLOR[statusOf(i)] : undefined;
     return i === focus ? (state.target.type === 'edit' ? EDIT_COLOR : PREVIEW_COLOR) : undefined;
   };
@@ -813,7 +911,7 @@ function renderProgression(model) {
       body = `<span class="h-num">${esc(chord.label)}</span><span class="h-sub">${esc(sym || '')} · ${esc(nn(e.bass))}${e.bassOctave ?? ""} ${esc(e.figures || "blank")} · ${DURATION_SYMBOL[durationOf(e)]}</span>`;
     }
     const insertMark = state.target.type === 'insert' && state.target.index === i ? '<li class="insert-mark" aria-label="Insert position">▸</li>' : '';
-    return `${insertMark}<li><button data-index="${i}" aria-pressed="${pressed}"><span class="idx">${i + 1}${e.newKeySig && i > 0 ? ' 🔑' : ''}</span>${body}</button></li>`;
+    return `${insertMark}<li><button data-index="${i}" aria-pressed="${pressed}"${playing?.index === i ? ' class="playing"' : ''}><span class="idx">${i + 1}${e.newKeySig && i > 0 ? ' 🔑' : ''}</span>${body}</button></li>`;
   });
   $('history').innerHTML = items.join('') || '<li class="empty">No chords yet. Choose a bass and figures, then press “Add to progression”.</li>';
 
@@ -909,6 +1007,7 @@ function suggestLine() {
 }
 
 function update() {
+  if (playing && playing.signature !== JSON.stringify(state.progression)) sound.stop();
   save();
   renderExercises();
   renderControls();
@@ -918,6 +1017,46 @@ function update() {
   renderResult(model);
   renderVoiceLeading(model);
   renderProgression(model);
+  renderQuickEdit(model);
+}
+
+// ---------------------------------------------------------------- quick edit
+
+/** The floating panel for fixing a chord without going back to the input panel. */
+function renderQuickEdit(model) {
+  const t = state.target;
+  const panel = $('quick-edit');
+  const open = t.type === 'edit' && !state.practice.on;
+  panel.hidden = !open;
+  document.body.classList.toggle('quick-editing', open);
+  if (!open) return;
+  const n = state.progression.length;
+  const d = model.inputDecoded;
+  const label = state.rest ? 'Rest' : (d && !d.error ? `${nn(currentBass())} · ${d.label}` : nn(currentBass()));
+  $('qe-title').textContent = `Chord ${t.index + 1} of ${n} · ${label}`;
+  $('qe-prev').disabled = t.index === 0;
+  $('qe-next').disabled = t.index >= n - 1;
+  $('qe-figures').innerHTML = FIGURE_BUTTONS.map((v) => {
+    const lines = parseFigures(v).written.map(figureLines);
+    return `<button data-fig="${esc(v)}" aria-pressed="${!state.rest && v === state.figures.trim()}" title="${esc(v === '' ? 'Blank' : v)}">${stagesHTML(lines)}</button>`;
+  }).join('');
+}
+
+/** Store the chord being edited right away (quick edit changes apply at once). */
+function saveEdit() {
+  const t = state.target;
+  if (t.type !== 'edit' || !compute().inputValid) { update(); return; }
+  state.progression[t.index] = { ...inputEntry(), user: state.progression[t.index].user };
+  update();
+}
+
+/** Move the bass a step up or down (by the key signature), keeping a fixed octave in step. */
+function stepBass(dir) {
+  let letter = state.bassLetter + dir;
+  let octave = state.bassOctave;
+  if (letter > 6) { letter = 0; if (octave != null) octave = Math.min(5, octave + 1); }
+  if (letter < 0) { letter = 6; if (octave != null) octave = Math.max(1, octave - 1); }
+  Object.assign(state, { bassLetter: letter, bassAcc: 'key', bassOctave: octave, rest: false, suggestion: null, previewChoice: [] });
 }
 
 // ---------------------------------------------------------------- actions
@@ -990,7 +1129,9 @@ function commit() {
     backToAppend();
   }
   update();
-  if (t.type === 'append') $('figures').focus();
+  // Leave the figures field, so the next letter key picks the next bass note
+  // (and a phone's keyboard closes after a chord is added).
+  if (document.activeElement === $('figures')) $('figures').blur();
 }
 
 function cancelEdit() {
@@ -1024,14 +1165,15 @@ function bind() {
   onButton('bass-letters', (b) => setInput({ bassLetter: Number(b.dataset.letter) }));
   onButton('bass-acc', (b) => setInput({ bassAcc: b.dataset.value === 'key' ? 'key' : Number(b.dataset.value) }));
   onButton('figure-buttons', (b) => {
-    setInput({ figures: b.dataset.fig });
-    $('figures').focus();
+    setInput({ figures: b.dataset.fig, rest: false });
+    if (state.settings.quickAdd) commit();
   });
+  $('quick-add').addEventListener('change', (e) => { state.settings.quickAdd = e.target.checked; update(); });
   $('figures').addEventListener('input', (e) => setInput({ figures: e.target.value }));
   $('figures').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); commit(); }
   });
-  $('clear-figures').addEventListener('click', () => { setInput({ figures: '' }); $('figures').focus(); });
+  $('clear-figures').addEventListener('click', () => setInput({ figures: '' }));
   onButton('duration-choice', (b) => setInput({ duration: b.dataset.value }));
   $('rest-toggle').addEventListener('click', () => setInput({ rest: !state.rest }));
 
@@ -1052,6 +1194,33 @@ function bind() {
   });
 
   $('print-btn').addEventListener('click', printScore);
+
+  // Sound
+  $('play-btn').addEventListener('click', togglePlay);
+  $('hear-chord').addEventListener('click', hearChord);
+  $('qe-hear').addEventListener('click', hearChord);
+  $('loop-toggle').addEventListener('click', () => { state.settings.sound.loop = !state.settings.sound.loop; save(); renderPlayer(); });
+  onButton('voice-toggles', (b) => {
+    const voices = state.settings.sound.voices;
+    const v = Number(b.dataset.voice);
+    if (voices[v] && voices.filter(Boolean).length === 1) return; // keep at least one voice
+    voices[v] = !voices[v];
+    sound.setVoices(voices);
+    save();
+    renderPlayer();
+  });
+
+  // Quick edit
+  onButton('qe-figures', (b) => {
+    Object.assign(state, { figures: b.dataset.fig, rest: false, suggestion: null, previewChoice: [] });
+    saveEdit();
+  });
+  $('qe-prev').addEventListener('click', () => { if (state.target.index > 0) startEdit(state.target.index - 1); });
+  $('qe-next').addEventListener('click', () => { if (state.target.index < state.progression.length - 1) startEdit(state.target.index + 1); });
+  $('qe-close').addEventListener('click', cancelEdit);
+  $('qe-delete').addEventListener('click', deleteEdited);
+  $('qe-bass-up').addEventListener('click', () => { stepBass(1); saveEdit(); });
+  $('qe-bass-down').addEventListener('click', () => { stepBass(-1); saveEdit(); });
 
   $('exercises-toggle').addEventListener('click', () => {
     const panel = $('exercises');
@@ -1172,11 +1341,28 @@ function bind() {
   });
   onButton('names-choice', (b) => { state.settings.names = b.dataset.value; update(); });
   $('auto-raise').addEventListener('change', (e) => { state.settings.autoRaise = e.target.checked; update(); });
+  $('part-toggles').addEventListener('change', (e) => {
+    const k = e.target.dataset.partToggle;
+    if (!k) return;
+    state.settings.show[k] = e.target.checked;
+    if (k === 'practice' && !e.target.checked) state.practice.on = false;
+    if (k === 'sound' && !e.target.checked) sound.stop();
+    if (k === 'exercises' && !e.target.checked) { $('exercises').hidden = true; $('exercises-toggle').setAttribute('aria-expanded', 'false'); }
+    update();
+  });
 
   // Keyboard: letters A-G pick the bass when not typing in a field; Escape cancels editing.
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && state.target.type !== 'append') { cancelEdit(); return; }
     if (e.target.closest('input, select, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
+    const onControl = e.target.closest('button, a, summary');
+    if (e.key === 'Enter' && !onControl) { e.preventDefault(); commit(); return; }
+    if (e.key === ' ' && !onControl && state.settings.show.sound) { e.preventDefault(); togglePlay(); return; }
+    if (state.target.type === 'edit' && !state.practice.on && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      const i = state.target.index + (e.key === 'ArrowRight' ? 1 : -1);
+      if (i >= 0 && i < state.progression.length) { e.preventDefault(); startEdit(i); }
+      return;
+    }
     if (state.practice.on && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && state.practice.sel) {
       e.preventDefault();
       const step = e.key === 'ArrowUp' ? 1 : -1;
@@ -1189,6 +1375,8 @@ function bind() {
       });
       return;
     }
+    // A digit or # starts typing figures for the current bass.
+    if (/^[1-9#]$/.test(e.key) && !state.rest) { $('figures').focus(); return; }
     const i = 'cdefgab'.indexOf(e.key.toLowerCase());
     if (i >= 0 && e.key.length === 1 && !state.rest) {
       setInput({ bassLetter: i, bassAcc: 'key' });
