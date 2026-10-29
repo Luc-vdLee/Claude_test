@@ -3,7 +3,7 @@ import { makeKey, KEY_TONICS, KEY_SIGNATURES, signatureAcc, signatureSpec, keyNa
 import { parseFigures, figureLines } from '../theory/figures.js';
 import { decode } from '../theory/decode.js';
 import { chordSymbolText, numeralText } from '../theory/chord.js';
-import { voiceProgression, tendenciesOf, checkVoicing, VOICES } from '../theory/voicing.js';
+import { voiceProgression, tendenciesOf, checkVoicing, explainVoicings, VOICES } from '../theory/voicing.js';
 import { parseLine, formatItem } from '../theory/line.js';
 import { suggestFigures } from '../theory/rule.js';
 import { buildVoices, layoutBars, barTicks, DURATION_TICKS, DURATION_NAMES } from '../theory/score.js';
@@ -737,7 +737,39 @@ function renderVoiceLeading(model) {
       <tbody>${rows}</tbody>
     </table>
     ${issueHTML ? `<div class="callouts">${issueHTML}</div>` : '<div class="callouts"><div class="callout">No voice-leading problems found.</div></div>'}
-    <p class="vl-meta">${meta}</p>`;
+    <p class="vl-meta">${meta}</p>
+    ${whyVoicingHTML(stages)}`;
+  el.querySelector('.why-voicing')?.addEventListener('toggle', (e) => { whyVoicingOpen = e.target.open; });
+}
+
+// Collapsed by default so it stays out of the way; remembers being opened until reload.
+let whyVoicingOpen = false;
+
+const points = (n) => String(Math.round(n * 10) / 10);
+
+/** The engine's best candidates for this chord with their penalty points, as a collapsible section. */
+function whyVoicingHTML(stages) {
+  const blocks = stages.map((s, si) => {
+    const cands = explainVoicings(s);
+    if (!cands.length) return '';
+    const rows = cands.map((c, i) => `<tr class="${c.chosen ? 'active' : ''}">
+        <td>${i + 1}${c.chosen ? ' ✓' : ''}</td>
+        <td class="p">${[3, 2, 1, 0].map((v) => esc(pitchName(c.notes[v], sys()))).join(' ')}</td>
+        <td class="num">${points(c.cost)}</td>
+        <td class="why-parts">${c.parts.length ? c.parts.map(([label, n]) => `${esc(label)} ${points(n)}`).join(' · ') : 'no penalties'}</td>
+      </tr>`).join('');
+    return `${stages.length > 1 ? `<div class="label">Step ${si + 1}</div>` : ''}
+      <table class="vl-table why-table">
+        <thead><tr><th>#</th><th>S A T B</th><th class="num">Points</th><th>Where the points come from</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }).join('');
+  if (!blocks) return '';
+  return `<details class="help why-voicing"${whyVoicingOpen ? ' open' : ''}>
+    <summary>Why this voicing?</summary>
+    <p>The app tries every four-part voicing that fits the voice ranges. Each one gets penalty points for every rule it bends (parallels, unresolved tendency tones, big leaps, doubling, spacing), and the lowest total wins. These are the best candidates it found; ✓ marks the one in use.</p>
+    ${blocks}
+  </details>`;
 }
 
 function renderKeyboardFor(model) {

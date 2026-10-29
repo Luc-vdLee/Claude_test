@@ -57,6 +57,12 @@ function tendencyKind(role, analysis) {
   return 'tendency';
 }
 
+/** Adds `n` to `parts[label]` when a breakdown is wanted; returns `n`. */
+function tally(parts, label, n) {
+  if (parts && n) parts[label] = (parts[label] ?? 0) + n;
+  return n;
+}
+
 function rangeOptions([lo, hi], pcs) {
   const out = [];
   for (let m = lo; m <= hi; m++) if (pcs.has(((m % 12) + 12) % 12)) out.push(m);
@@ -78,7 +84,7 @@ function bassOptions(spec, prevBass) {
   return out;
 }
 
-function staticCost(spec, midis, issues) {
+function staticCost(spec, midis, issues, parts) {
   let cost = 0;
   const counts = new Map(spec.map((e) => [e.pc, 0]));
   for (const m of midis) counts.set(((m % 12) + 12) % 12, counts.get(((m % 12) + 12) % 12) + 1);
@@ -86,15 +92,15 @@ function staticCost(spec, midis, issues) {
     const c = counts.get(e.pc);
     if (c === 0) {
       if (e.required) return Infinity;
-      cost += e.seventhChord ? 3 : 8;
+      cost += tally(parts, 'Missing 5th', e.seventhChord ? 3 : 8);
       issues?.push({ level: 'info', text: 'The 5th is left out (allowed in root position).' });
     } else if (c > 1) {
-      cost += (c - 1) * e.doubleCost + (c > 2 ? 4 : 0);
+      cost += tally(parts, 'Doubling', (c - 1) * e.doubleCost + (c > 2 ? 4 : 0));
       if (e.doubleCost >= 60) issues?.push({ level: 'warn', text: `Doubled ${e.kind ?? 'tendency tone'} — avoid doubling notes that must resolve.` });
     }
   }
   const [b, t, a, s] = midis;
-  if (t - b > 19) cost += (t - b - 19);
+  if (t - b > 19) cost += tally(parts, 'Spacing', t - b - 19);
   return cost;
 }
 
@@ -105,19 +111,19 @@ function entryFor(spec, midi) {
   return spec.find((e) => e.pc === ((midi % 12) + 12) % 12);
 }
 
-function transitionCost(prevSpec, prev, spec, cur, issues) {
+function transitionCost(prevSpec, prev, spec, cur, issues, parts) {
   let cost = 0;
 
   for (let v = 1; v < 4; v++) {
     const d = Math.abs(cur[v] - prev[v]);
-    cost += d;
-    if (d > 5) cost += (d - 5) * 2;
+    cost += tally(parts, 'Motion', d);
+    if (d > 5) cost += tally(parts, 'Leaps', (d - 5) * 2);
     if (d > 12) {
-      cost += 30;
+      cost += tally(parts, 'Leaps', 30);
       issues?.push({ level: 'warn', text: `${VOICES[v]} leaps more than an octave.` });
     }
-    if (v < 3 && cur[v] > prev[v + 1]) { cost += 6; issues?.push({ level: 'info', text: `${VOICES[v]} overlaps the previous ${VOICES[v + 1].toLowerCase()} note.` }); }
-    if (v > 0 && cur[v] < prev[v - 1]) { cost += 6; issues?.push({ level: 'info', text: `${VOICES[v]} overlaps the previous ${VOICES[v - 1].toLowerCase()} note.` }); }
+    if (v < 3 && cur[v] > prev[v + 1]) { cost += tally(parts, 'Overlap', 6); issues?.push({ level: 'info', text: `${VOICES[v]} overlaps the previous ${VOICES[v + 1].toLowerCase()} note.` }); }
+    if (v > 0 && cur[v] < prev[v - 1]) { cost += tally(parts, 'Overlap', 6); issues?.push({ level: 'info', text: `${VOICES[v]} overlaps the previous ${VOICES[v - 1].toLowerCase()} note.` }); }
   }
 
   for (const [i, j] of PAIRS) {
@@ -125,7 +131,7 @@ function transitionCost(prevSpec, prev, spec, cur, issues) {
     const pi = (((prev[j] - prev[i]) % 12) + 12) % 12;
     const ci = (((cur[j] - cur[i]) % 12) + 12) % 12;
     if (pi === ci && (ci === 0 || ci === 7)) {
-      cost += 100;
+      cost += tally(parts, 'Parallels', 100);
       issues?.push({ level: 'error', text: `Parallel ${ci === 7 ? '5ths' : 'octaves'}: ${VOICES[j]} and ${VOICES[i]}.` });
     }
   }
@@ -134,7 +140,7 @@ function transitionCost(prevSpec, prev, spec, cur, issues) {
   const dB = cur[0] - prev[0];
   const outer = (((cur[3] - cur[0]) % 12) + 12) % 12;
   if (dS !== 0 && dB !== 0 && Math.sign(dS) === Math.sign(dB) && (outer === 0 || outer === 7) && Math.abs(dS) > 2) {
-    cost += 15;
+    cost += tally(parts, 'Direct 5th/8ve', 15);
     issues?.push({ level: 'warn', text: `Direct ${outer === 7 ? '5th' : 'octave'} between Soprano and Bass (similar motion with a leap in the soprano).` });
   }
 
@@ -151,7 +157,7 @@ function transitionCost(prevSpec, prev, spec, cur, issues) {
       if (!resolved) {
         let penalty = { suspension: 120, seventh: 40, aug6: 40 }[from.kind] ?? (v === 3 ? 40 : 10);
         if (from.kind === 'seventh' && cur[v] === prev[v]) penalty = 15;
-        cost += penalty;
+        cost += tally(parts, 'Unresolved', penalty);
         const dir = from.tendency > 0 ? 'up' : 'down';
         issues?.push({ level: penalty >= 40 ? 'error' : 'warn', text: `${VOICES[v]}: ${from.kind ?? 'tendency tone'} doesn't resolve ${dir} by step.` });
       }
@@ -164,16 +170,17 @@ function transitionCost(prevSpec, prev, spec, cur, issues) {
     const b = withOctave(entryFor(spec, cur[v]).note, cur[v]);
     const iv = intervalName(a, b);
     if (iv.quality.startsWith('A') || iv.quality.startsWith('d')) {
-      cost += iv.quality.startsWith('A') ? 20 : 4;
+      cost += tally(parts, 'Awkward interval', iv.quality.startsWith('A') ? 20 : 4);
       if (iv.quality.startsWith('A')) issues?.push({ level: 'warn', text: `${VOICES[v]} moves by an augmented interval (${iv.short}).` });
     }
   }
   return cost;
 }
 
-function firstChordCost(midis) {
+function firstChordCost(midis, parts) {
   const [, t, a, s] = midis;
-  return Math.abs(s - IDEAL_FIRST_SOPRANO) / 2 + Math.max(0, s - a - 7) / 2 + Math.max(0, a - t - 7) / 2;
+  return tally(parts, 'Soprano height', Math.abs(s - IDEAL_FIRST_SOPRANO) / 2)
+    + tally(parts, 'Spacing', Math.max(0, s - a - 7) / 2 + Math.max(0, a - t - 7) / 2);
 }
 
 /** All valid voicings of a chord, best first. `fixedBass` (midi) pins the bass octave. */
@@ -193,7 +200,7 @@ export function rankVoicings(spec, prev, prevBass, fixedBass = null) {
         let cost = staticCost(spec, midis) + bassCost;
         if (!Number.isFinite(cost)) continue;
         cost += prev ? transitionCost(prev.spec, prev.midis, spec, midis) : firstChordCost(midis);
-        out.push({ midis, cost });
+        out.push({ midis, cost, bassCost });
       }
     }
   }
@@ -233,9 +240,38 @@ export function voiceProgression(chords, choices = [], fixedBass = []) {
       issues.unshift({ level: 'warn', text: 'The bass is outside the usual range (E2–D4).' });
     }
     const result = { spec, midis, notes, issues, alternatives: ranked.length, choice, prevMidis: prev?.midis ?? null };
+    // Kept for explainVoicings(): the best few candidates and what they connect to.
+    Object.defineProperty(result, 'ranking', { value: { ranked: ranked.slice(0, Math.max(EXPLAIN_COUNT, choice + 1)), prev } });
     prev = { spec, midis };
     return result;
   }) : null));
+}
+
+const EXPLAIN_COUNT = 5;
+
+/**
+ * Why the engine picked this voicing: the best candidates it scored, each with
+ * its total penalty split by rule (lower is better). `chosen` marks the one in use.
+ * @returns {Array<{ notes, midis, cost, parts: Array<[label, points]>, chosen }>}
+ */
+export function explainVoicings(voiced) {
+  if (!voiced?.ranking) return [];
+  const { ranked, prev } = voiced.ranking;
+  const spec = voiced.spec;
+  return ranked.map(({ midis, cost, bassCost }, i) => {
+    const parts = {};
+    tally(parts, 'Bass octave', bassCost);
+    staticCost(spec, midis, null, parts);
+    if (prev) transitionCost(prev.spec, prev.midis, spec, midis, null, parts);
+    else firstChordCost(midis, parts);
+    return {
+      midis,
+      notes: midis.map((m) => withOctave(entryFor(spec, m).note, m)),
+      cost,
+      parts: Object.entries(parts).sort((a, b) => b[1] - a[1]),
+      chosen: i === voiced.choice,
+    };
+  });
 }
 
 /** For each voice: tendency of the note it sings in this voicing, if any. */
