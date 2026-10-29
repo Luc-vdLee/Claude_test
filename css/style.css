@@ -258,6 +258,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: 
 .motion.leap { color: var(--warn); }
 .tag { display: inline-block; font-size: .72rem; border-radius: 999px; padding: 1px 8px; background: var(--accent-soft); color: var(--ink); margin-left: 4px; }
 .vl-meta { color: var(--muted); font-size: .85rem; margin-top: 8px; }
+.why-voicing { margin-top: 12px; }
+.why-voicing p { margin: 8px 0; }
+.why-table { font-size: .85rem; }
+.why-table td.p { font-size: 1rem; }
+.why-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.why-table td.why-parts { color: var(--muted); }
 
 /* Progression */
 .staff-wrap { overflow-x: auto; background: var(--paper); border-radius: 8px; border: 1px solid var(--line); }
