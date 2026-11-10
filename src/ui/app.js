@@ -11,6 +11,8 @@ import { renderScore } from './staff.js';
 import { renderKeyboard, VOICE_COLORS } from './keyboard.js';
 import { playbackNotes } from '../theory/playback.js';
 import * as sound from './sound.js';
+import { initLearn } from './learn.js';
+import { realizationGrade, REALIZATIONS } from '../theory/learn.js';
 
 const STORAGE_KEY = 'figured-bass-decoder:v1';
 const EXERCISES_KEY = 'figured-bass-decoder:exercises';
@@ -23,7 +25,7 @@ const FIGURE_BUTTONS = ['', '5/3', '6', '6/4', '7', '6/5', '4/3', '4/2', '#', 'b
 // The first row of figure buttons; the rest appear under "More".
 const FIGURE_COMMON = ['', '5/3', '6', '6/4', '7', '6/5'];
 const FIGURE_MORE = FIGURE_BUTTONS.filter((v) => !FIGURE_COMMON.includes(v));
-const TABS = ['score', 'voicing', 'keyboard', 'line', 'exercises', 'settings'];
+const TABS = ['score', 'voicing', 'keyboard', 'line', 'exercises', 'learn', 'settings'];
 // Parts of the page that can be switched off in Settings (all on by default).
 const PARTS = [
   ['octave', 'Bass octave controls'],
@@ -38,6 +40,7 @@ const PARTS = [
   ['scoreSettings', 'Score settings'],
   ['print', 'Print / PDF'],
   ['exercises', 'Exercises'],
+  ['learn', 'Learn tab: lessons, quizzes and realizations'],
 ];
 const INPUT_FIELDS = ['tonic', 'mode', 'bassLetter', 'bassAcc', 'bassOctave', 'figures', 'duration', 'rest', 'newKeySig'];
 
@@ -58,6 +61,7 @@ const defaults = () => ({
   suggestion: null, // explanation of the last suggested figures
   practice: { on: false, voice: 3, sel: null, showSolution: false, checked: false },
   exerciseId: null,
+  learnTask: null, // id of the Learn realization this exercise belongs to
   exerciseName: 'Exercise 1',
   lineText: '',
   settings: {
@@ -120,7 +124,7 @@ function storeExercises() {
 const newId = () => `ex-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
 function exerciseData() {
-  return { tonic: state.tonic, mode: state.mode, progression: state.progression, score: state.score };
+  return { tonic: state.tonic, mode: state.mode, progression: state.progression, score: state.score, learnTask: state.learnTask ?? undefined };
 }
 
 function saveCurrentExercise() {
@@ -139,6 +143,7 @@ function openExercise(x) {
   state.progression = Array.isArray(d.progression) ? d.progression : [];
   if (d.score) state.score = { ...defaults().score, ...d.score };
   if (d.tonic) { state.tonic = d.tonic; state.mode = d.mode ?? 'major'; }
+  state.learnTask = d.learnTask ?? null;
   backToAppend();
   state.practice.sel = null;
   state.previewChoice = [];
@@ -554,6 +559,10 @@ function renderTabs() {
   const shown = state.practice.on && tab === 'score' ? ['score', 'voicing', 'keyboard'] : [tab];
   for (const t of TABS) button(t).setAttribute('aria-selected', String(t === tab));
   for (const el of document.querySelectorAll('[data-tab-panel]')) el.classList.toggle('active', shown.includes(el.dataset.tabPanel));
+  // The Learn tab has its own questions, so the current-chord strip makes way for it.
+  const learning = tab === 'learn';
+  if (learning && !document.body.classList.contains('learning')) learn.render();
+  document.body.classList.toggle('learning', learning);
 }
 
 // ---------------------------------------------------------------- sound
@@ -817,11 +826,21 @@ function renderPractice(model) {
   }
 
   let summary = '';
+  const task = state.learnTask && REALIZATIONS_BY_ID[state.learnTask];
+  if (task) {
+    const statuses = steps.map(stepStatus);
+    const percent = realizationGrade(statuses);
+    const allWritten = steps.length > 0 && steps.every((s) => s.complete);
+    if (p.checked && allWritten) learn.recordRealization(task.id, percent);
+    summary += `<div class="callout learn-task"><strong>Learn: ${esc(task.title)}</strong> · ${p.checked
+      ? (allWritten ? `Grade: <strong>${percent}%</strong> (✓ = 1 point, warning = ½, error = 0)` : `Grade so far: ${percent}%. Write every chord to get your final grade.`)
+      : 'Write soprano, alto and tenor for every chord, then press <em>Check my voices</em> for your grade.'}</div>`;
+  }
   if (p.checked) {
     const complete = steps.filter((s) => s.complete);
     const bad = complete.filter((s) => stepStatus(s) === 'error');
     const warn = complete.filter((s) => stepStatus(s) === 'warn');
-    summary = `<div class="practice-summary">
+    summary += `<div class="practice-summary">
       <strong>${complete.length} of ${steps.length}</strong> chord steps written ·
       <span class="ok-text">${complete.length - bad.length - warn.length} ✓</span> ·
       <span class="warn-text">${warn.length} with warnings</span> ·
@@ -1393,7 +1412,7 @@ function bind() {
   $('pickup').addEventListener('change', (e) => { state.score.pickup = Number(e.target.value); update(); });
   $('score-key').addEventListener('change', (e) => { state.score.keySig = e.target.value; update(); });
 
-  onButton('names-choice', (b) => { state.settings.names = b.dataset.value; update(); });
+  onButton('names-choice', (b) => { state.settings.names = b.dataset.value; update(); learn.render(); });
   $('auto-raise').addEventListener('change', (e) => { state.settings.autoRaise = e.target.checked; update(); });
   $('part-toggles').addEventListener('change', (e) => {
     const k = e.target.dataset.partToggle;
@@ -1406,6 +1425,10 @@ function bind() {
 
   // Keyboard: letters A-G pick the bass when not typing in a field; Escape cancels editing.
   document.addEventListener('keydown', (e) => {
+    if (document.body.classList.contains('learning')) {
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && learn.onKey(e)) e.preventDefault();
+      return;
+    }
     if (e.key === 'Escape' && state.target.type !== 'append') { cancelEdit(); return; }
     if (e.target.closest('input, select, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
     const onControl = e.target.closest('button, a, summary');
@@ -1447,6 +1470,56 @@ function bind() {
     resizeTimer = setTimeout(update, 150);
   });
 }
+
+// ---------------------------------------------------------------- learn
+
+const REALIZATIONS_BY_ID = Object.fromEntries(REALIZATIONS.map((r) => [r.id, r]));
+
+function keyParts(keySpec) {
+  const minor = keySpec.endsWith('m');
+  return { tonic: minor ? keySpec.slice(0, -1) : keySpec, mode: minor ? 'minor' : 'major' };
+}
+
+/** Put a lesson example into the current-chord strip and show the Score tab. */
+function openInDecoder({ keySpec, bass, figures }) {
+  const { tonic, mode } = keyParts(keySpec);
+  if (state.target.type !== 'append') backToAppend();
+  state.practice.on = false;
+  const sigAcc = signatureAcc(makeKey(tonic, mode), bass.letter);
+  Object.assign(state, {
+    tonic, mode, bassLetter: bass.letter, bassAcc: bass.acc === sigAcc ? 'key' : bass.acc,
+    bassOctave: null, figures, rest: false, suggestion: null, previewChoice: [],
+  });
+  state.settings.tab = 'score';
+  update();
+  renderTabs();
+}
+
+/** Open a Learn bass line as a new exercise in Practice mode. */
+function startRealization(r) {
+  const { tonic, mode } = keyParts(r.key);
+  const key = makeKey(tonic, mode);
+  const progression = parseLine(r.line).map((item) => ({
+    tonic, mode,
+    bass: { letter: item.letter, acc: item.acc ?? signatureAcc(key, item.letter) },
+    bassOctave: item.octave, figures: item.figures, duration: item.duration ?? 'q',
+    rest: false, newKeySig: false, choice: [],
+  }));
+  newExercise(`Learn: ${r.title}`, { tonic, mode, progression, score: { ...defaults().score }, learnTask: r.id });
+  state.settings.show.practice = true;
+  state.practice = { ...defaults().practice, on: true, sel: { event: 0, stage: 0 } };
+  state.settings.tab = 'score';
+  update();
+  renderTabs();
+}
+
+const learn = initLearn({
+  root: $('learn'),
+  names: sys,
+  soundOn: () => state.settings.show.sound && sound.soundAvailable(),
+  openInDecoder,
+  startRealization,
+});
 
 bind();
 update();

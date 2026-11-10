@@ -433,3 +433,84 @@ body.quick-editing .footer { padding-bottom: 300px; }
   .quick-edit { bottom: 0; width: 100%; border-radius: var(--radius) var(--radius) 0 0; border-bottom: 0; }
   .qe-figures { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
+
+/* ---------------------------------------------------------------- Learn tab */
+.learning .strip, .learning .quick-edit { display: none !important; }
+.learn-panel.active { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; }
+.learn-panel h2 { font-size: 1.5rem; }
+.learn-panel h3 { font-family: var(--serif); font-weight: 600; font-size: 1.1rem; margin: 0 0 8px; }
+.learn-panel p { line-height: 1.55; margin: 0 0 10px; }
+.learn-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+.learn-head .hint { margin: 4px 0 0; }
+.learn-stats { display: flex; gap: 8px; }
+.learn-stats div { background: var(--paper); color: #2a2520; border: 1px solid var(--line); border-radius: 10px; padding: 6px 14px; text-align: center; min-width: 92px; }
+.learn-stats strong { display: block; font-family: var(--serif); font-size: 1.4rem; }
+.learn-stats span { font-size: .78rem; color: #665c51; }
+.learn-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .learn-grid { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; } }
+.lesson-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lesson-open { width: 100%; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; text-align: left; padding: 10px 14px; background: var(--paper); color: #2a2520; }
+.lesson-card.next .lesson-open { border: 2px solid var(--accent); }
+.lesson-num { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--ink); font-family: var(--serif); font-weight: 700; }
+.lesson-card.done .lesson-num { background: var(--accent); color: var(--accent-ink); }
+.lesson-text strong { display: block; font-family: var(--serif); font-size: 1.05rem; }
+.lesson-text span { font-size: .88rem; color: #665c51; }
+.lesson-score { display: grid; justify-items: end; gap: 2px; white-space: nowrap; }
+.lesson-score small { color: #665c51; }
+.next-tag { color: var(--accent) !important; font-weight: 700; }
+.stars { color: #c08a12; letter-spacing: 1px; font-size: 1.05rem; }
+.stars-off { color: color-mix(in srgb, currentColor 25%, transparent); }
+.learn-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.realize-list .ex-name { white-space: normal; }
+.learn-box { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.test-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.test-row:first-of-type { border-top: 0; }
+.test-row small { display: block; color: var(--muted); }
+.realize-list .ex-meta { display: block; }
+.realize-best { color: var(--good); font-weight: 600; white-space: nowrap; }
+.linklike { border: 0; background: none; padding: 0; min-height: 0; color: var(--muted); text-decoration: underline; }
+
+.learn-nav { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.quiz-title { font-family: var(--serif); font-weight: 600; flex: 1; }
+.lesson-body { display: grid; gap: 18px; }
+@media (min-width: 900px) { .lesson-body { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; } }
+.lesson-intro { font-family: var(--serif); font-size: 1.08rem; max-width: 62ch; }
+.quiz-start { display: grid; gap: 6px; margin-top: 16px; font-family: var(--sans); font-size: 1rem; }
+.lesson-examples { display: grid; gap: 10px; }
+.example { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+.example figcaption { display: grid; gap: 4px; }
+.example-result { font-family: var(--serif); }
+.example details { font-size: .9rem; }
+.example ul, .quiz-feedback ul, .missed-list ul { margin: 4px 0 0; padding-left: 18px; }
+.mini-staff { background: var(--paper); border-radius: 8px; border: 1px solid var(--line); line-height: 0; justify-self: start; }
+.mini-staff svg { display: block; }
+
+.quiz-progress { display: flex; gap: 4px; }
+.quiz-progress span { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
+.quiz-progress .cur { background: var(--accent); opacity: .5; }
+.quiz-progress .ok { background: var(--good); }
+.quiz-progress .bad { background: var(--bad); }
+.quiz-card { display: grid; gap: 18px; }
+@media (min-width: 900px) { .quiz-card { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: start; } }
+.quiz-prompt { font-family: var(--serif); font-size: 1.3rem; line-height: 1.4; margin: 4px 0 12px !important; }
+.quiz-chord { font-family: var(--serif); font-size: 1.1rem; }
+.quiz-options { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 600px) { .quiz-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.quiz-option { display: flex; align-items: center; gap: 10px; text-align: left; min-height: 64px; font-family: var(--serif); font-size: 1.1rem; padding: 10px 14px; }
+.quiz-option kbd { font: .75rem var(--sans); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--muted); }
+.quiz-option:disabled { cursor: default; opacity: .6; }
+.quiz-option.right { opacity: 1; border: 2px solid var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+.quiz-option.wrong { opacity: 1; border: 2px solid var(--bad); background: var(--bad-soft); }
+.quiz-actions { margin-top: 12px; }
+.quiz-actions .primary { width: auto; margin-left: auto; }
+.quiz-feedback, .quiz-hint { margin-top: 12px; }
+.result-card { text-align: center; border: 1px solid var(--line); border-radius: 12px; padding: 20px; display: grid; justify-items: center; gap: 4px; }
+.result-card.passed { border: 2px solid var(--good); }
+.result-big { font-family: var(--serif); font-size: 3rem; font-weight: 700; line-height: 1; }
+.result-card .stars { font-size: 1.6rem; }
+.result-actions { justify-content: center; margin-top: 8px; }
+.result-actions .primary { width: auto; }
+.missed-list { display: grid; gap: 10px; padding-left: 22px; }
+.missed-list p { margin: 0 0 4px; }
+.fig-inline { font-family: var(--serif); font-weight: 700; }
+.callout.learn-task { margin-top: 12px; }
