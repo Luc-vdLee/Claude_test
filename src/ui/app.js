@@ -71,7 +71,7 @@ const defaults = () => ({
     moreFigures: false, // the extra rows of figure buttons are open
     tab: 'score',
     show: Object.fromEntries(PARTS.map(([k]) => [k, true])),
-    sound: { voices: [true, true, true, true], loop: false }, // voices: bass, tenor, alto, soprano
+    sound: { voices: [true, true, true, true], loop: false, autoPlay: true }, // voices: bass, tenor, alto, soprano; autoPlay: hear each chord as it is added
   },
   score: { timeSig: '4/4', customNum: 5, customDen: 4, pickup: 0, keySig: 'auto' },
 });
@@ -573,6 +573,7 @@ function renderPlayer() {
   const voices = state.settings.sound.voices;
   $('voice-toggles').innerHTML = [3, 2, 1, 0].map((v) => `<button data-voice="${v}" aria-pressed="${voices[v]}" title="${voices[v] ? 'Mute' : 'Hear'} the ${VOICES[v].toLowerCase()}"><span class="dot" style="background:${VOICE_COLORS[v]}"></span>${VOICES[v][0]}</button>`).join('');
   $('loop-toggle').setAttribute('aria-pressed', String(state.settings.sound.loop));
+  $('autoplay-toggle').setAttribute('aria-pressed', String(state.settings.sound.autoPlay));
   $('play-btn').textContent = playing ? '■ Stop' : '▶ Play';
   $('play-btn').disabled = !playing && state.progression.length === 0;
   $('play-btn').setAttribute('aria-pressed', String(!!playing));
@@ -597,6 +598,15 @@ function togglePlay() {
     onStop: () => { playing = null; renderPlayer(); renderProgression(compute()); },
   });
   renderPlayer();
+}
+
+/** Play one chord of the stored progression, when "Hear each chord" is on (not while the whole harmony plays). */
+function autoPlayChord(i) {
+  if (!state.settings.sound.autoPlay || !state.settings.show.sound || playing) return;
+  const model = storedModel();
+  if (!model.entries[i] || model.entries[i].rest || !model.voiced[i]?.[0]?.midis) return;
+  sound.setVoices(state.settings.sound.voices);
+  sound.play(notesFor(model, i, i + 1));
 }
 
 /** Play the chord shown in the result panel (the input, or the chord being edited). */
@@ -1127,6 +1137,7 @@ function saveEdit() {
   if (t.type !== 'edit' || !compute().inputValid) { update(); return; }
   state.progression[t.index] = { ...inputEntry(), user: state.progression[t.index].user };
   update();
+  autoPlayChord(t.index);
 }
 
 /** Move the bass a step up or down (by the key signature), keeping a fixed octave in step. */
@@ -1193,6 +1204,7 @@ function commit() {
   if (!inputValid) return;
   const entry = inputEntry();
   const t = state.target;
+  const added = t.type === 'append' ? state.progression.length : t.index;
   if (t.type === 'edit') state.progression[t.index] = { ...entry, user: state.progression[t.index].user };
   else if (t.type === 'insert') state.progression.splice(t.index, 0, entry);
   else state.progression.push(entry);
@@ -1208,6 +1220,7 @@ function commit() {
     backToAppend();
   }
   update();
+  autoPlayChord(added);
   // Leave the figures field, so the next letter key picks the next bass note
   // (and a phone's keyboard closes after a chord is added).
   if (document.activeElement === $('figures')) $('figures').blur();
@@ -1282,6 +1295,12 @@ function bind() {
   $('play-btn').addEventListener('click', togglePlay);
   $('hear-chord').addEventListener('click', hearChord);
   $('qe-hear').addEventListener('click', hearChord);
+  $('autoplay-toggle').addEventListener('click', () => { state.settings.sound.autoPlay = !state.settings.sound.autoPlay; save(); renderPlayer(); });
+  // Sound may only start after the first touch or key press, so unlock it then.
+  const unlockSound = () => { if (state.settings.show.sound) sound.unlock(); };
+  document.addEventListener('pointerdown', unlockSound, { capture: true });
+  document.addEventListener('keydown', unlockSound, { capture: true });
+  document.addEventListener('touchend', unlockSound, { capture: true });
   $('loop-toggle').addEventListener('click', () => { state.settings.sound.loop = !state.settings.sound.loop; save(); renderPlayer(); });
   onButton('voice-toggles', (b) => {
     const voices = state.settings.sound.voices;
