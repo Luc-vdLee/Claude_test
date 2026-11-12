@@ -12,7 +12,7 @@ import { renderKeyboard, VOICE_COLORS } from './keyboard.js';
 import { playbackNotes } from '../theory/playback.js';
 import * as sound from './sound.js';
 import { initLearn } from './learn.js';
-import { realizationGrade, REALIZATIONS } from '../theory/learn.js';
+import { realizationGrade, REALIZATIONS, lessonById, exampleData } from '../theory/learn.js';
 
 const STORAGE_KEY = 'figured-bass-decoder:v1';
 const EXERCISES_KEY = 'figured-bass-decoder:exercises';
@@ -1603,13 +1603,103 @@ function startRealization(r) {
   renderTabs();
 }
 
+// ---------------------------------------------------------------- lesson decoder
+// While the Learn tab is open, a compact decoder shows the chords of the open lesson,
+// each fully voiced on a small grand staff. "Show in decoder" highlights one of them.
+// It never touches the user's own progression.
+
+const lessonDecoder = { view: 'home', lessonId: null, selected: 0 };
+
+/** One lesson example, decoded and voiced on its own. */
+function lessonChord(ex) {
+  const d = exampleData(ex, sys());
+  const decoded = decode(d.key, d.bass, d.figures, decodeOptions());
+  const voiced = decoded.error ? null : voiceProgression([decoded])[0];
+  return { d, decoded, voiced };
+}
+
+function renderLessonDecoder() {
+  const el = $('lesson-decoder');
+  const { view, lessonId } = lessonDecoder;
+  if (view !== 'lesson' || !lessonId) {
+    el.innerHTML = `<h2>Lesson decoder</h2><p class="empty">${view === 'quiz'
+      ? 'Hidden during the quiz, so it doesn\'t give the answers away.'
+      : 'Open a lesson: its chords appear here, fully voiced. Press “Show in decoder” on an example to look at it closely.'}</p>`;
+    return;
+  }
+  const lesson = lessonById(lessonId);
+  const chords = lesson.examples.map(lessonChord);
+  const sel = Math.min(lessonDecoder.selected, chords.length - 1);
+  const cur = chords[sel];
+  let detail = `<p class="error-text">${esc(cur.decoded.error ?? '')}</p>`;
+  if (!cur.decoded.error) {
+    const a = cur.decoded.main;
+    const symbol = a.type === 'tertian' || a.type === 'aug6' ? chordSymbolText(a, sys()) : '';
+    const notes = (cur.voiced?.[cur.voiced.length - 1]?.notes ?? []).slice().reverse();
+    detail = `
+      <div class="ld-eyebrow">${esc(keyName(cur.d.key, sys()))} · bass ${esc(nn(cur.d.bass))} · ${stagesHTML(cur.decoded.written)}</div>
+      <div class="ld-main"><span class="ld-symbol">${esc(symbol)}</span>${numeralHTML(cur.decoded)}</div>
+      <p class="ld-long">${esc(a.type === 'tertian' ? `${nn(a.root)} ${a.longName}${a.inversionName ? ', ' + a.inversionName : ''}` : a.longName ?? '')}</p>
+      <div class="ld-voices">${notes.map((n, i) => `<span><small>${['S', 'A', 'T', 'B'][i]}</small>${esc(pitchName(n, sys()))}</span>`).join('')}</div>
+      <div class="row tight ld-actions">
+        ${state.settings.show.sound && sound.soundAvailable() ? '<button class="ghost" id="ld-hear">▶ Hear</button>' : ''}
+        <button class="ghost" id="ld-full" title="Leave Learn and load this chord into the main decoder">Edit in full decoder</button>
+      </div>`;
+  }
+  el.innerHTML = `
+    <h2>Lesson decoder</h2>
+    <div class="ld-detail">${detail}</div>
+    <div class="ld-list">${chords.map((c, k) => `
+      <button class="ld-example" data-ex="${k}" aria-pressed="${k === sel}" title="${esc(c.d.title)}">
+        <div class="ld-staff" id="ld-staff-${k}"></div>
+        <span class="ld-cap">${esc(c.d.title)}</span>
+      </button>`).join('')}</div>`;
+  chords.forEach((c, k) => {
+    if (!c.voiced) return;
+    const built = buildVoices([{ ticks: 8, rest: false, stages: c.voiced }]);
+    const bars = layoutBars(built, { timeSig: { num: 2, den: 4 }, pickup: 0, initialKey: c.d.keySig, keyChanges: [] });
+    const events = [{
+      color: k === sel ? PREVIEW_COLOR : undefined,
+      stages: c.decoded.stages.map((_, si) => ({ figures: c.decoded.written[si] ?? [], numeral: si === 0 ? shortNumeral(c.decoded) : '' })),
+    }];
+    renderScore($(`ld-staff-${k}`), { bars, timeSig: { num: 2, den: 4 }, events, emptyKey: c.d.keySig, noTimeSig: true, layoutWidth: 210, scale: 0.72 });
+  });
+}
+
+function bindLessonDecoder() {
+  $('lesson-decoder').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const chords = lessonById(lessonDecoder.lessonId)?.examples ?? [];
+    if (b.dataset.ex) { lessonDecoder.selected = Number(b.dataset.ex); renderLessonDecoder(); }
+    else if (b.id === 'ld-hear') {
+      const c = lessonChord(chords[lessonDecoder.selected]);
+      if (!c.voiced) return;
+      sound.setVoices(state.settings.sound.voices);
+      sound.play(notesFor({ entries: [{ duration: 'h' }], voiced: [c.voiced] }, 0, 1));
+    } else if (b.id === 'ld-full') {
+      openInDecoder(exampleData(chords[lessonDecoder.selected]));
+    }
+  });
+}
+
 const learn = initLearn({
   root: $('learn'),
   names: sys,
   soundOn: () => state.settings.show.sound && sound.soundAvailable(),
-  openInDecoder,
   startRealization,
+  onView: ({ name, lessonId }) => {
+    if (lessonId !== lessonDecoder.lessonId) lessonDecoder.selected = 0;
+    Object.assign(lessonDecoder, { view: name, lessonId });
+    renderLessonDecoder();
+  },
+  showExample: (lessonId, index) => {
+    Object.assign(lessonDecoder, { view: 'lesson', lessonId, selected: index });
+    renderLessonDecoder();
+    if (!isDesktop()) $('lesson-decoder').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
 });
+bindLessonDecoder();
 
 bind();
 update();

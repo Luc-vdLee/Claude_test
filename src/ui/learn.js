@@ -30,10 +30,11 @@ function loadProgress() {
  * @param {HTMLElement} opts.root            the Learn tab panel
  * @param {() => string} opts.names          note-name system ('english' | 'german' | 'dutch')
  * @param {() => boolean} opts.soundOn        whether sound is switched on in Settings
- * @param {(ex:{keySpec, bass, figures}) => void} opts.openInDecoder
  * @param {(r:object) => void} opts.startRealization
+ * @param {(v:{name:string, lessonId:string|null}) => void} [opts.onView]   the Learn view changed
+ * @param {(lessonId:string, index:number) => void} [opts.showExample]     "Show in decoder" on an example
  */
-export function initLearn({ root, names, soundOn, openInDecoder, startRealization }) {
+export function initLearn({ root, names, soundOn, startRealization, onView = () => {}, showExample = () => {} }) {
   let progress = loadProgress();
   // view: { name: 'home' } | { name: 'lesson', id } | { name: 'quiz', ... } | { name: 'result', ... }
   let view = { name: 'home' };
@@ -160,7 +161,7 @@ export function initLearn({ root, names, soundOn, openInDecoder, startRealizatio
           <details><summary>How to read it</summary><ul>${d.explain.map((l) => `<li>${esc(l)}</li>`).join('')}</ul></details>
           <span class="row tight">
             ${soundOn() ? `<button class="ghost" data-hear="${k}">▶ Hear</button>` : ''}
-            <button class="ghost" data-decode="${k}">Open in decoder</button>
+            <button class="ghost" data-decode="${k}" title="Show this chord, fully voiced, in the lesson decoder">Show in decoder</button>
           </span>
         </figcaption>
       </figure>`;
@@ -270,6 +271,7 @@ export function initLearn({ root, names, soundOn, openInDecoder, startRealizatio
       const el = root.querySelector('#quiz-staff');
       if (el) drawBass(el, { ...q, showFigures: q.show.figures });
     } else if (view.name === 'result') root.innerHTML = resultHTML();
+    onView({ name: view.name, lessonId: view.name === 'lesson' ? view.id : null });
   }
 
   // ------------------------------------------------------------ actions
@@ -337,10 +339,8 @@ export function initLearn({ root, names, soundOn, openInDecoder, startRealizatio
     else if (b.dataset.choice) answer(Number(b.dataset.choice));
     else if (b.dataset.realize) startRealization(REALIZATIONS.find((r) => r.id === b.dataset.realize));
     else if (b.dataset.hear) hear(exampleData(lessonById(view.id).examples[Number(b.dataset.hear)]));
-    else if (b.dataset.decode) {
-      const d = exampleData(lessonById(view.id).examples[Number(b.dataset.decode)]);
-      openInDecoder(d);
-    } else if (act === 'home') { view = { name: 'home' }; render(); }
+    else if (b.dataset.decode) showExample(view.id, Number(b.dataset.decode));
+    else if (act === 'home') { view = { name: 'home' }; render(); }
     else if (act === 'leave') {
       if (view.answers.length && !confirm('Stop this quiz? Your answers so far are not graded.')) return;
       view = view.lessonId ? { name: 'lesson', id: view.lessonId } : { name: 'home' };

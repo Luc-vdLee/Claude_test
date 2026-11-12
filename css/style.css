@@ -295,9 +295,12 @@ input.invalid, textarea.invalid { border-color: var(--bad) !important; box-shado
 
   /* Right column: the selected tab */
   .pane-panels .tab-panels { gap: 10px; }
-  body.learning .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
-  body.learning .pane-visual { order: 1; }
+  /* Learn: the lesson takes the room, a small lesson decoder sits on the right */
+  body.learning .layout { grid-template-columns: minmax(0, 1fr) clamp(300px, 27vw, 420px); }
   body.learning .pane-input { display: none; }
+  body.learning .pane-panels { order: 1; }
+  body.learning .pane-visual { order: 2; overflow-y: auto; }
+  body.learning .pane-visual > [data-tab-panel] { display: none; }
 }
 
 .panel {
@@ -600,6 +603,29 @@ body.quick-editing .footer { padding-bottom: 300px; }
 
 /* ---------------------------------------------------------------- Learn tab */
 .learning .strip, .learning .card-global, .learning .card-result, .learning .quick-edit { display: none !important; }
+
+/* ---------------------------------------------------------------- lesson decoder (Learn tab) */
+.lesson-decoder { display: none; }
+.learning .lesson-decoder { display: block; order: 6; }
+.lesson-decoder h2 { font-size: 1.05rem; margin-bottom: 8px; }
+.ld-detail { border: 2px solid var(--accent); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; background: var(--panel); }
+.ld-eyebrow { font-size: .78rem; color: var(--muted); }
+.ld-main { display: flex; align-items: baseline; gap: 10px; }
+.ld-symbol { font-family: var(--serif); font-size: 1.6rem; font-weight: 600; }
+.ld-main .numeral { font-size: 1.3rem; }
+.ld-long { margin: 0 0 6px; font-size: .85rem; color: var(--muted); }
+.ld-voices { display: flex; gap: 10px; flex-wrap: wrap; font-family: var(--serif); font-size: 1.02rem; margin-bottom: 6px; }
+.ld-voices small { font-family: var(--sans); font-size: .66rem; color: var(--muted); margin-right: 3px; font-weight: 700; }
+.ld-actions button { min-height: 32px; padding: 3px 10px; font-size: .88rem; }
+.ld-list { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.ld-example {
+  display: block; width: 100%; min-width: 0; overflow: hidden; padding: 4px 6px 6px; text-align: left; background: var(--paper);
+  border: 1px solid var(--line); border-radius: 10px; color: #2a2520;
+}
+.ld-example[aria-pressed="true"] { border: 2px solid var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ld-staff { pointer-events: none; overflow: hidden; display: flex; justify-content: center; }
+.ld-staff #staff, .ld-staff svg { display: block; }
+.ld-cap { display: block; font-size: .78rem; color: #665c51; padding: 0 4px; }
 .learn-panel.active { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; }
 .learn-panel h2 { font-size: 1.5rem; }
 .learn-panel h3 { font-family: var(--serif); font-weight: 600; font-size: 1.1rem; margin: 0 0 8px; }

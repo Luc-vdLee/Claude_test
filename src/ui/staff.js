@@ -89,8 +89,12 @@ function makeNote(VF, clef, piece, voice, color) {
  * @param {boolean} [data.singleLine]  draw everything on one line (for a horizontally scrolling view)
  * @param {number} [data.fitHeight]    shrink the notation so up to `fitLines` lines fit this height (px)
  * @param {number} [data.fitLines]
+ * @param {boolean} [data.noTimeSig]   leave out the time signature (single chords)
+ * @param {number} [data.minScale]     smallest scale fitHeight may shrink to
+ * @param {number} [data.layoutWidth]  lay out at this width instead of the container's (with `scale`)
+ * @param {number} [data.scale]        draw at this fixed scale
  */
-export function renderScore(container, { bars, timeSig, events, onSelect, emptyKey, singleLine = false, fitHeight = null, fitLines = 2 }) {
+export function renderScore(container, { bars, timeSig, events, onSelect, emptyKey, singleLine = false, fitHeight = null, fitLines = 2, noTimeSig = false, minScale = 0.55, layoutWidth = null, scale: fixedScale = null }) {
   container.innerHTML = '';
   container.onclick = null;
   const VF = window.Vex?.Flow;
@@ -120,15 +124,16 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
 
   // Scale: lay the score out at full size and draw it smaller. A smaller scale gives each
   // line more room, so the number of lines is recomputed a few times until it settles.
-  let scale = 1;
-  if (fitHeight && !singleLine) {
+  let scale = fixedScale ?? 1;
+  if (fitHeight && !singleLine && !fixedScale) {
     for (let k = 0; k < 4; k++) {
       const n = planSystems(bars, width / scale - 20).length;
-      scale = Math.min(1, Math.max(0.55, (fitHeight - 4) / (Math.min(n, fitLines) * SYSTEM_HEIGHT + 10)));
+      scale = Math.min(1, Math.max(minScale, (fitHeight - 4) / (Math.min(n, fitLines) * SYSTEM_HEIGHT + 10)));
     }
   }
-  const outWidth = width;
+  let outWidth = width;
   width = width / scale;
+  if (layoutWidth) { width = layoutWidth; outWidth = layoutWidth * scale; }
   const systems = planSystems(bars, singleLine ? Infinity : width - 20);
   if (singleLine) width = Math.max(width, Math.ceil(systems[0].used) + 30);
   const fullHeight = systems.length * SYSTEM_HEIGHT + 10;
@@ -162,7 +167,7 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
       for (const [stave, clef] of [[treble, 'treble'], [bass, 'bass']]) {
         if (first) stave.addClef(clef).addKeySignature(bar.key);
         else if (bar.keyChanged) stave.addKeySignature(bar.key, bars[bi - 1].key);
-        if (bi === 0) stave.addTimeSignature(`${timeSig.num}/${timeSig.den}`);
+        if (bi === 0 && !noTimeSig) stave.addTimeSignature(`${timeSig.num}/${timeSig.den}`);
         if (bi === bars.length - 1) stave.setEndBarType(VF.Barline.type.END);
         else if (bars[bi + 1].keyChanged) stave.setEndBarType(VF.Barline.type.DOUBLE);
         stave.setContext(ctx).draw();
