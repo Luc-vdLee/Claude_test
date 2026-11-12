@@ -226,12 +226,40 @@ input.invalid, textarea.invalid { border-color: var(--bad) !important; box-shado
   .pane-visual { overflow: hidden; }
   .pane-visual > [data-tab-panel] { display: block; }
   .pane-visual > .progression-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
-  .progression-panel { padding: 12px 14px; }
-  .progression-panel > .panel-head { margin-bottom: 8px; }
-  .progression-panel > .panel-head .row { flex-wrap: nowrap; }
-  .progression-panel .panel-head button, .progression-panel .player button { min-height: 34px; padding-top: 3px; padding-bottom: 3px; }
-  .progression-panel > .player { margin-bottom: 6px; }
-  .progression-panel > .score-settings { margin: 4px 0 8px; }
+  .progression-panel { padding: 8px 12px 12px; }
+  /* One slim toolbar: player, score settings and the score buttons */
+  .layout .score-bar { flex-wrap: nowrap; gap: 6px; margin-bottom: 8px; }
+  .layout .score-bar .bl, .score-bar h2, .score-bar .tempo { display: none; }
+  .layout .score-bar .player, .score-bar .panel-head .row { flex-wrap: nowrap; gap: 4px; }
+  .layout .score-bar button { min-height: 32px; padding: 3px 8px; font-size: .9rem; }
+  .layout .score-bar .play-btn { min-width: 0; padding: 3px 12px; }
+  .layout .score-bar .voice-toggles button { padding: 3px 7px; min-width: 32px; min-height: 30px; }
+  .layout .score-bar .player, .layout .score-bar { align-items: center; }
+  .layout .score-bar .voice-toggles { flex-wrap: nowrap; }
+  .layout .score-bar .play-btn { min-height: 32px; height: 32px; }
+  .layout .score-bar .voice-toggles button { min-width: 30px; padding: 3px 6px; }
+  .layout .score-bar .voice-toggles .dot { margin-right: 4px; }
+  .layout .score-bar .btn-icon { margin: 0; }
+  .layout .score-bar .panel-head { margin: 0 0 0 auto; }
+  .layout .score-bar .score-settings { margin: 0; position: relative; }
+  .layout .score-bar .score-settings summary {
+    list-style: none; border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px; min-height: 32px;
+    display: flex; align-items: center; white-space: nowrap; font-size: .9rem;
+  }
+  .layout .score-bar .score-settings summary::-webkit-details-marker { display: none; }
+  .layout .score-bar .score-settings summary::after { content: "▾"; margin-left: 5px; color: var(--muted); }
+  .layout .score-bar .score-settings[open] summary { border-color: var(--accent); background: var(--accent-soft); }
+  .layout .score-bar .score-settings .score-grid {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 15; width: max-content; max-width: 360px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0, 0, 0, .16);
+    padding: 12px 14px; margin: 0;
+  }
+  .layout .score-bar .score-settings .hint { display: none; }
+  @media (max-width: 1600px) {
+    .layout .score-bar { gap: 4px; }
+    .layout .score-bar button { padding-left: 7px; padding-right: 7px; }
+    .layout .score-bar #practice-toggle span { display: none; }
+  }
   .keyboard-panel { padding: 10px 12px; }
   .keyboard-panel h2 { display: none; }
   .keyboard-panel .keyboard-wrap { margin-top: 0; }
@@ -531,7 +559,12 @@ body.practicing .input-panel .primary { opacity: .9; }
 .quick-add input { margin-top: 2px; }
 
 /* Sound */
-.player { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.score-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 10px; }
+.score-bar .panel-head { margin: 0; flex: 1 1 auto; }
+.score-bar .score-settings { margin: 0; }
+.btn-icon { width: 17px; height: 17px; flex: none; margin-right: 6px; vertical-align: -3px; }
+.score-bar button { display: inline-flex; align-items: center; justify-content: center; }
+.player { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .player .play-btn { width: auto; min-width: 104px; }
 .voice-toggles button { min-width: 46px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
 .voice-toggles button[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }

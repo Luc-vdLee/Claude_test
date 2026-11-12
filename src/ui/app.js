@@ -1016,7 +1016,14 @@ function renderProgression(model) {
     color,
     selectedOf: (i, si) => practice && state.practice.sel?.event === i && state.practice.sel?.stage === si,
   });
-  renderScore($('staff'), { ...score, singleLine: isPhone(), onSelect: (hit) => (practice ? placeFromStaff(hit) : selectEvent(hit.event)) });
+  // Desktop: shrink the notation so two lines fit the space under the toolbar.
+  let fitHeight = null;
+  if (isDesktop()) {
+    const wrap = $('staff-wrap');
+    const panel = wrap.closest('.progression-panel');
+    fitHeight = panel.getBoundingClientRect().bottom - wrap.getBoundingClientRect().top - 14;
+  }
+  renderScore($('staff'), { ...score, fitHeight, singleLine: isPhone(), onSelect: (hit) => (practice ? placeFromStaff(hit) : selectEvent(hit.event)) });
   if (isPhone() && model.focus != null) {
     // One long line on a phone: keep the chord being worked on in view.
     const hit = $('staff').querySelector(`.chord-hit[data-event="${model.focus}"]`);

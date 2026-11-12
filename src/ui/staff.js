@@ -87,8 +87,10 @@ function makeNote(VF, clef, piece, voice, color) {
  *        called on a click with the nearest chord step and, for clicks on a staff, the
  *        clicked position as a diatonic step number (octave * 7 + letter).
  * @param {boolean} [data.singleLine]  draw everything on one line (for a horizontally scrolling view)
+ * @param {number} [data.fitHeight]    shrink the notation so up to `fitLines` lines fit this height (px)
+ * @param {number} [data.fitLines]
  */
-export function renderScore(container, { bars, timeSig, events, onSelect, emptyKey, singleLine = false }) {
+export function renderScore(container, { bars, timeSig, events, onSelect, emptyKey, singleLine = false, fitHeight = null, fitLines = 2 }) {
   container.innerHTML = '';
   container.onclick = null;
   const VF = window.Vex?.Flow;
@@ -116,10 +118,22 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
     return;
   }
 
+  // Scale: lay the score out at full size and draw it smaller. A smaller scale gives each
+  // line more room, so the number of lines is recomputed a few times until it settles.
+  let scale = 1;
+  if (fitHeight && !singleLine) {
+    for (let k = 0; k < 4; k++) {
+      const n = planSystems(bars, width / scale - 20).length;
+      scale = Math.min(1, Math.max(0.55, (fitHeight - 4) / (Math.min(n, fitLines) * SYSTEM_HEIGHT + 10)));
+    }
+  }
+  const outWidth = width;
+  width = width / scale;
   const systems = planSystems(bars, singleLine ? Infinity : width - 20);
   if (singleLine) width = Math.max(width, Math.ceil(systems[0].used) + 30);
+  const fullHeight = systems.length * SYSTEM_HEIGHT + 10;
   const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
-  renderer.resize(width, systems.length * SYSTEM_HEIGHT + 10);
+  renderer.resize(width, fullHeight);
   const ctx = renderer.getContext();
 
   const sequence = [[], [], [], []]; // per voice: { piece, sn, system }
@@ -255,13 +269,21 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
     });
   });
 
+  const svgEl = container.querySelector('svg');
+  if (scale !== 1) {
+    svgEl.setAttribute('viewBox', `0 0 ${width} ${fullHeight}`);
+    svgEl.setAttribute('width', String(Math.round(outWidth)));
+    svgEl.setAttribute('height', String(Math.round(fullHeight * scale)));
+    svgEl.style.width = `${Math.round(outWidth)}px`;
+    svgEl.style.height = `${Math.round(fullHeight * scale)}px`;
+  }
   if (onSelect) {
-    const svg = container.querySelector('svg');
-    addChordOverlay(container, hitboxes);
+    const svg = svgEl;
+    addChordOverlay(container, hitboxes, scale);
     container.onclick = (e) => {
       const r = svg.getBoundingClientRect();
-      const px = e.clientX - r.left;
-      const py = e.clientY - r.top;
+      const px = (e.clientX - r.left) / scale;
+      const py = (e.clientY - r.top) / scale;
       const nearest = (list) => {
         let best = null;
         for (const h of list) {
@@ -295,7 +317,7 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
  * Invisible slices over each chord, so the score shows it can be clicked: pointer cursor and a
  * soft highlight on hover. Clicks fall through to the container's handler.
  */
-function addChordOverlay(container, hitboxes) {
+function addChordOverlay(container, hitboxes, scale = 1) {
   const layer = document.createElement('div');
   layer.className = 'chord-hits';
   const bySystem = new Map();
@@ -317,7 +339,7 @@ function addChordOverlay(container, hitboxes) {
       const div = document.createElement('div');
       div.className = 'chord-hit';
       div.dataset.event = String(e.event);
-      div.style.cssText = `left:${left}px;top:${e.y0 + 4}px;width:${right - left}px;height:${e.y1 - e.y0 - 14}px`;
+      div.style.cssText = `left:${left * scale}px;top:${(e.y0 + 4) * scale}px;width:${(right - left) * scale}px;height:${(e.y1 - e.y0 - 14) * scale}px`;
       div.title = `Chord ${e.event + 1}: click to edit`;
       layer.appendChild(div);
     });
