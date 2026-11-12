@@ -12,12 +12,24 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <header class="appbar" id="appbar">
+    <div class="appbar-inner">
+      <span class="brand">Figured Bass Decoder</span>
+      <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
+        <button role="tab" data-tab="score"><svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span class="tab-label">Score</span></button>
+        <button role="tab" data-tab="voicing" data-part="voicePanel"><svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M3 10h18M3 15h18M3 20h18"/><circle cx="8" cy="5" r="1.6" fill="currentColor"/><circle cx="15" cy="10" r="1.6" fill="currentColor"/><circle cx="11" cy="15" r="1.6" fill="currentColor"/><circle cx="6" cy="20" r="1.6" fill="currentColor"/></svg><span class="tab-label">Voicing</span></button>
+        <button role="tab" data-tab="keyboard" data-part="keyboard"><svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="M9 13v7M15 13v7"/><rect x="7" y="4" width="4" height="9" rx=".5" fill="currentColor" stroke="none"/><rect x="13" y="4" width="4" height="9" rx=".5" fill="currentColor" stroke="none"/></svg><span class="tab-label">Keyboard</span></button>
+        <button role="tab" data-tab="line" data-part="lineEntry"><svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="m4 15 4-6 4 4 4-7 4 5"/></svg><span class="tab-label">Bass line</span></button>
+        <button role="tab" data-tab="exercises" data-part="exercises"><svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="tab-label">Exercises</span></button>
+        <button role="tab" data-tab="learn" data-part="learn"><svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/><path d="M22 10v5"/></svg><span class="tab-label">Learn</span></button>
+        <span class="tabs-title" aria-hidden="true" id="tabs-ex"></span>
+        <button role="tab" data-tab="settings" class="tab-settings" aria-label="Settings" title="Settings"><svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </nav>
+    </div>
+  </header>
+
   <main class="layout">
     <div class="pane pane-visual">
-      <header class="topbar">
-        <h1>Figured Bass Decoder</h1>
-        <span class="topbar-ex" id="topbar-ex"></span>
-      </header>
       <section class="panel progression-panel" data-tab-panel="score" aria-label="Score">
         <div class="panel-head">
           <h2>Score</h2>
@@ -60,17 +72,6 @@
     </div>
 
     <div class="pane pane-controls">
-      <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
-        <button role="tab" data-tab="score">Score</button>
-        <button role="tab" data-tab="voicing" data-part="voicePanel">Voicing</button>
-        <button role="tab" data-tab="keyboard" data-part="keyboard">Keyboard</button>
-        <button role="tab" data-tab="line" data-part="lineEntry">Bass line</button>
-        <button role="tab" data-tab="exercises" data-part="exercises">Exercises</button>
-        <button role="tab" data-tab="learn" data-part="learn">Learn</button>
-        <button role="tab" data-tab="settings">Settings</button>
-        <span class="tabs-title" aria-hidden="true">Figured Bass Decoder · <span id="tabs-ex"></span></span>
-      </nav>
-
       <section class="panel card card-global" aria-label="Key, time and tempo">
         <div class="card-title">Piece</div>
         <div class="global-grid">

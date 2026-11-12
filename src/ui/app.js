@@ -35,7 +35,6 @@ const TABS = ['score', 'voicing', 'keyboard', 'line', 'exercises', 'learn', 'set
 const PARTS = [
   ['octave', 'Bass octave controls'],
   ['figureButtons', 'Figure buttons, Quick add and Suggest'],
-  ['figureHelp', 'How to type figures'],
   ['noteValues', 'Note values and Rest'],
   ['lineEntry', 'Type a whole bass line'],
   ['voicePanel', 'Voice leading (SATB)'],
@@ -173,7 +172,6 @@ function newExercise(name, data) {
 function renderExercises() {
   const nameInput = $('exercise-name');
   if (document.activeElement !== nameInput) nameInput.value = state.exerciseName;
-  $('topbar-ex').textContent = state.exerciseName;
   $('tabs-ex').textContent = state.exerciseName;
   const fmt = (t) => new Date(t).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
   $('exercise-list').innerHTML = exercises.map((x) => {
