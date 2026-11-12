@@ -86,15 +86,17 @@ function makeNote(VF, clef, piece, voice, color) {
  * @param {(hit:{event:number, stage:number, clef?:string, diatonic?:number})=>void} [data.onSelect]
  *        called on a click with the nearest chord step and, for clicks on a staff, the
  *        clicked position as a diatonic step number (octave * 7 + letter).
+ * @param {boolean} [data.singleLine]  draw everything on one line (for a horizontally scrolling view)
  */
-export function renderScore(container, { bars, timeSig, events, onSelect, emptyKey }) {
+export function renderScore(container, { bars, timeSig, events, onSelect, emptyKey, singleLine = false }) {
   container.innerHTML = '';
+  container.onclick = null;
   const VF = window.Vex?.Flow;
   if (!VF) {
     container.textContent = 'The notation library could not be loaded.';
     return;
   }
-  const width = Math.max(320, (container.parentElement?.clientWidth || 600) - 2);
+  let width = Math.max(320, (container.parentElement?.clientWidth || 600) - 2);
 
   if (bars.length === 0) {
     const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
@@ -114,7 +116,8 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
     return;
   }
 
-  const systems = planSystems(bars, width - 20);
+  const systems = planSystems(bars, singleLine ? Infinity : width - 20);
+  if (singleLine) width = Math.max(width, Math.ceil(systems[0].used) + 30);
   const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
   renderer.resize(width, systems.length * SYSTEM_HEIGHT + 10);
   const ctx = renderer.getContext();
@@ -205,7 +208,7 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
       bar.voices[1].forEach((p, i) => {
         const sn = notes[1][i];
         const nx = sn.getAbsoluteX();
-        hitboxes.push({ event: p.event, x: nx + 6, y0: top, y1: top + SYSTEM_HEIGHT });
+        hitboxes.push({ event: p.event, x: nx + 6, y0: top, y1: top + SYSTEM_HEIGHT, system: si });
       });
       x += w;
     });
@@ -254,8 +257,8 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
 
   if (onSelect) {
     const svg = container.querySelector('svg');
-    svg.style.cursor = 'pointer';
-    svg.addEventListener('click', (e) => {
+    addChordOverlay(container, hitboxes);
+    container.onclick = (e) => {
       const r = svg.getBoundingClientRect();
       const px = e.clientX - r.left;
       const py = e.clientY - r.top;
@@ -284,6 +287,40 @@ export function renderScore(container, { bars, timeSig, events, onSelect, emptyK
       // Clicks far outside the staves (e.g. on the figures) only select the chord.
       const inRange = clef === 'treble' ? diatonic <= topDiatonic + 5 : diatonic >= topDiatonic - 8 - 6;
       onSelect({ event: stage.event, stage: stage.stage, clef, diatonic: inRange ? diatonic : null });
+    };
+  }
+}
+
+/**
+ * Invisible slices over each chord, so the score shows it can be clicked: pointer cursor and a
+ * soft highlight on hover. Clicks fall through to the container's handler.
+ */
+function addChordOverlay(container, hitboxes) {
+  const layer = document.createElement('div');
+  layer.className = 'chord-hits';
+  const bySystem = new Map();
+  for (const h of hitboxes) {
+    if (!bySystem.has(h.system)) bySystem.set(h.system, new Map());
+    const events = bySystem.get(h.system);
+    const e = events.get(h.event) ?? { event: h.event, min: h.x, max: h.x, y0: h.y0, y1: h.y1 };
+    e.min = Math.min(e.min, h.x);
+    e.max = Math.max(e.max, h.x);
+    events.set(h.event, e);
+  }
+  for (const events of bySystem.values()) {
+    const list = [...events.values()].sort((a, b) => a.min - b.min);
+    list.forEach((e, i) => {
+      const prev = list[i - 1];
+      const next = list[i + 1];
+      const left = Math.max(prev ? (prev.max + e.min) / 2 : e.min - 24, e.min - 34);
+      const right = Math.min(next ? (e.max + next.min) / 2 : e.max + 30, e.max + 40);
+      const div = document.createElement('div');
+      div.className = 'chord-hit';
+      div.dataset.event = String(e.event);
+      div.style.cssText = `left:${left}px;top:${e.y0 + 4}px;width:${right - left}px;height:${e.y1 - e.y0 - 14}px`;
+      div.title = `Chord ${e.event + 1}: click to edit`;
+      layer.appendChild(div);
     });
   }
+  container.appendChild(layer);
 }

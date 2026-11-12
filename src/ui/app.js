@@ -22,9 +22,14 @@ const EDIT_COLOR = '#1d5fa8';
 const PLAY_COLOR = '#b0601e';
 
 const FIGURE_BUTTONS = ['', '5/3', '6', '6/4', '7', '6/5', '4/3', '4/2', '#', 'b', 'n', '7 #', '#6', '4-3', '9-8', '7-6', '6/4-5/3'];
-// The first row of figure buttons; the rest appear under "More".
-const FIGURE_COMMON = ['', '5/3', '6', '6/4', '7', '6/5'];
-const FIGURE_MORE = FIGURE_BUTTONS.filter((v) => !FIGURE_COMMON.includes(v));
+// The Figure Builder keypad: common figures, then the accidental toggles and the linear figures.
+const KEYPAD_FIGURES = ['', '5/3', '6', '6/4', '7', '6/5', '4/3', '4/2'];
+const KEYPAD_LINEAR = ['7 #', '4-3', '9-8', '7-6', '6/4-5/3'];
+const MODIFIERS = [['#', '♯', 'Sharp'], ['b', '♭', 'Flat'], ['n', '♮', 'Natural']];
+const MOD_SYMBOL = Object.fromEntries(MODIFIERS.map(([k, sym]) => [k, sym]));
+const DESKTOP_QUERY = '(min-width: 1025px)';
+const isDesktop = () => window.matchMedia(DESKTOP_QUERY).matches;
+const isPhone = () => !window.matchMedia('(min-width: 700px)').matches;
 const TABS = ['score', 'voicing', 'keyboard', 'line', 'exercises', 'learn', 'settings'];
 // Parts of the page that can be switched off in Settings (all on by default).
 const PARTS = [
@@ -68,7 +73,7 @@ const defaults = () => ({
     names: 'english',
     autoRaise: false,
     quickAdd: false,
-    moreFigures: false, // the extra rows of figure buttons are open
+    tempo: 72, // quarter notes per minute
     tab: 'score',
     show: Object.fromEntries(PARTS.map(([k]) => [k, true])),
     sound: { voices: [true, true, true, true], loop: false, autoPlay: true }, // voices: bass, tenor, alto, soprano; autoPlay: hear each chord as it is added
@@ -459,6 +464,31 @@ function setChecked(groupId, value) {
   for (const b of $(groupId).querySelectorAll('button')) b.setAttribute('aria-checked', String(b.dataset.value === String(value)));
 }
 
+/** The Figure Builder: figure keys plus ♯ ♭ ♮ toggles that alter the next figure tapped. */
+function renderKeypad() {
+  const mod = keypadMod;
+  const current = state.figures.trim();
+  const key = (v, extra = '') => {
+    const shown = mod ? applyModifier(v, mod) : v;
+    const lines = shown === '' ? [[]] : parseFigures(shown).written.map(figureLines);
+    const title = v === '' ? (mod ? `A lone ${MOD_SYMBOL[mod]}: alters the 3rd above the bass` : 'Blank: unfigured bass (root position, nothing printed)') : shown;
+    return `<button class="key${extra}" data-fig="${esc(v)}" aria-pressed="${!state.rest && !mod && v === current}" title="${esc(title)}" ${state.rest ? 'disabled' : ''}>${stagesHTML(lines)}</button>`;
+  };
+  const mods = MODIFIERS.map(([k, sym, name]) => `<button class="key mod" data-mod="${k}" aria-pressed="${mod === k}" title="${name}: tap, then tap a figure" ${state.rest ? 'disabled' : ''}>${sym}</button>`).join('');
+  $('fig-keypad').innerHTML = KEYPAD_FIGURES.map((v) => key(v)).join('') + mods + KEYPAD_LINEAR.map((v) => key(v, ' linear')).join('');
+  $('keypad-hint').textContent = mod
+    ? `${MOD_SYMBOL[mod]} is on: tap a figure to put ${MOD_SYMBOL[mod]} on its top number, or tap the first key for a lone ${MOD_SYMBOL[mod]} (the 3rd).`
+    : '';
+}
+
+/** Put an accidental on the first figure number of `v`; on a blank, a lone accidental (the 3rd). */
+function applyModifier(v, mod) {
+  if (v === '') return mod;
+  return v.replace(/\d/, (d) => mod + d);
+}
+
+let keypadMod = null;
+
 function renderControls() {
   const key = currentKey();
   const t = state.target;
@@ -487,18 +517,11 @@ function renderControls() {
   const fig = $('figures');
   if (fig.value !== state.figures) fig.value = state.figures;
   fig.disabled = state.rest;
-  const figButton = (v) => {
-    const lines = parseFigures(v).written.map(figureLines);
-    const title = v === '' ? 'Blank: unfigured bass (root position, nothing printed)' : v;
-    return `<button data-fig="${esc(v)}" aria-pressed="${!state.rest && v === state.figures.trim()}" title="${esc(title)}" ${state.rest ? 'disabled' : ''}>${stagesHTML(lines)}</button>`;
-  };
-  $('figure-buttons').innerHTML = FIGURE_COMMON.map(figButton).join('');
-  $('figure-more').innerHTML = FIGURE_MORE.map(figButton).join('');
-  const more = state.settings.moreFigures;
-  $('figure-more').hidden = !more;
-  $('fig-more').textContent = more ? 'Less ▴' : 'More ▾';
-  $('fig-more').setAttribute('aria-expanded', String(more));
-  $('fig-more').classList.toggle('has-sel', !more && !state.rest && FIGURE_MORE.includes(state.figures.trim()));
+  renderKeypad();
+  const figError = !state.rest && state.figures.trim() ? parseFigures(state.figures).error : null;
+  fig.classList.toggle('invalid', !!figError);
+  fig.setAttribute('aria-invalid', String(!!figError));
+  $('fig-error').textContent = figError ?? '';
 
   for (const b of $('duration-choice').querySelectorAll('button')) if (!b.innerHTML) b.innerHTML = noteIcon(b.dataset.value);
   $('rest-toggle').setAttribute('aria-pressed', String(state.rest));
@@ -556,7 +579,14 @@ function renderTabs() {
   const button = (tab) => document.querySelector(`#tabs [data-tab="${tab}"]`);
   let tab = TABS.includes(state.settings.tab) ? state.settings.tab : 'score';
   if (button(tab).classList.contains('part-off')) tab = 'score';
-  const shown = state.practice.on && tab === 'score' ? ['score', 'voicing', 'keyboard'] : [tab];
+  let shown = state.practice.on && tab === 'score' ? ['score', 'voicing', 'keyboard'] : [tab];
+  if (isDesktop()) {
+    // Desktop: the score and keyboard always sit in the left column; the right column shows another tab.
+    if (tab === 'score' || tab === 'keyboard') tab = ['voicing', 'line', 'exercises', 'settings'].find((t) => !button(t).classList.contains('part-off'));
+    shown = [tab, 'score', 'keyboard'];
+    // Practice: the panel you write the voices in is always shown.
+    if (state.practice.on && tab !== 'learn') shown.push('voicing');
+  }
   for (const t of TABS) button(t).setAttribute('aria-selected', String(t === tab));
   for (const el of document.querySelectorAll('[data-tab-panel]')) el.classList.toggle('active', shown.includes(el.dataset.tabPanel));
   // The Learn tab has its own questions, so the current-chord strip makes way for it.
@@ -573,6 +603,9 @@ function renderPlayer() {
   const voices = state.settings.sound.voices;
   $('voice-toggles').innerHTML = [3, 2, 1, 0].map((v) => `<button data-voice="${v}" aria-pressed="${voices[v]}" title="${voices[v] ? 'Mute' : 'Hear'} the ${VOICES[v].toLowerCase()}"><span class="dot" style="background:${VOICE_COLORS[v]}"></span>${VOICES[v][0]}</button>`).join('');
   $('loop-toggle').setAttribute('aria-pressed', String(state.settings.sound.loop));
+  $('tempo-label').textContent = `${state.settings.tempo} bpm`;
+  $('tempo-val').textContent = `${state.settings.tempo} bpm`;
+  if (document.activeElement !== $('tempo')) $('tempo').value = state.settings.tempo;
   $('autoplay-toggle').setAttribute('aria-pressed', String(state.settings.sound.autoPlay));
   $('play-btn').textContent = playing ? '■ Stop' : '▶ Play';
   $('play-btn').disabled = !playing && state.progression.length === 0;
@@ -582,7 +615,7 @@ function renderPlayer() {
 /** Timed notes for the chords `from`..`to` of a voiced model. */
 function notesFor(model, from = 0, to = model.entries.length) {
   const events = model.entries.slice(from, to).map((e, k) => ({ ticks: DURATION_TICKS[durationOf(e)], rest: !!e.rest, stages: model.voiced[from + k] }));
-  const timed = playbackNotes(buildVoices(events));
+  const timed = playbackNotes(buildVoices(events), { tempo: state.settings.tempo });
   const shift = (x) => ({ ...x, event: x.event + from });
   return { ...timed, notes: timed.notes.map(shift), events: timed.events.map(shift) };
 }
@@ -985,7 +1018,16 @@ function renderProgression(model) {
     color,
     selectedOf: (i, si) => practice && state.practice.sel?.event === i && state.practice.sel?.stage === si,
   });
-  renderScore($('staff'), { ...score, onSelect: (hit) => (practice ? placeFromStaff(hit) : selectEvent(hit.event)) });
+  renderScore($('staff'), { ...score, singleLine: isPhone(), onSelect: (hit) => (practice ? placeFromStaff(hit) : selectEvent(hit.event)) });
+  if (isPhone() && model.focus != null) {
+    // One long line on a phone: keep the chord being worked on in view.
+    const hit = $('staff').querySelector(`.chord-hit[data-event="${model.focus}"]`);
+    const sc = $('staff-scroll');
+    if (hit && (hit.offsetLeft < sc.scrollLeft || hit.offsetLeft + hit.offsetWidth > sc.scrollLeft + sc.clientWidth)) {
+      sc.scrollLeft = hit.offsetLeft - sc.clientWidth / 2;
+    }
+  }
+  updateStaffShadow();
 
   // History list (the stored progression; the input is shown at its position)
   const items = state.progression.map((e, i) => {
@@ -1007,6 +1049,12 @@ function renderProgression(model) {
   $('undo').disabled = state.progression.length === 0;
   $('clear-all').disabled = state.progression.length === 0;
   $('practice-toggle').setAttribute('aria-pressed', String(state.practice.on));
+}
+
+/** Shade the score's right edge while more of it is hidden off to the right (phone swipe hint). */
+function updateStaffShadow() {
+  const sc = $('staff-scroll');
+  $('staff-wrap').classList.toggle('more-right', sc.scrollWidth - sc.clientWidth - sc.scrollLeft > 4);
 }
 
 /** The bass note the focused chord is actually voiced with (for the octave controls). */
@@ -1053,6 +1101,8 @@ function renderLine() {
   if (ta.value !== state.lineText) ta.value = state.lineText;
   const rows = lineEntries();
   const errors = rows.filter((r) => r.item.error);
+  ta.classList.toggle('invalid', errors.length > 0);
+  ta.setAttribute('aria-invalid', String(errors.length > 0));
   $('line-preview').innerHTML = rows.map(({ item, entry }) => {
     if (item.error) return `<span class="line-chip bad">${esc(item.raw)}</span>`;
     if (entry.rest) return `<span class="line-chip">rest ${DURATION_SYMBOL[entry.duration]}</span>`;
@@ -1256,22 +1306,28 @@ function bind() {
   $('new-keysig').addEventListener('change', (e) => setInput({ newKeySig: e.target.checked }));
   onButton('bass-letters', (b) => setInput({ bassLetter: Number(b.dataset.letter) }));
   onButton('bass-acc', (b) => setInput({ bassAcc: b.dataset.value === 'key' ? 'key' : Number(b.dataset.value) }));
-  const pickFigure = (b) => {
-    setInput({ figures: b.dataset.fig, rest: false });
+  onButton('fig-keypad', (b) => {
+    if (b.dataset.mod) {
+      keypadMod = keypadMod === b.dataset.mod ? null : b.dataset.mod;
+      renderKeypad();
+      return;
+    }
+    const figures = keypadMod ? applyModifier(b.dataset.fig, keypadMod) : b.dataset.fig;
+    keypadMod = null;
+    setInput({ figures, rest: false });
     if (state.settings.quickAdd) commit();
-  };
-  onButton('figure-buttons', pickFigure);
-  onButton('figure-more', pickFigure);
-  $('fig-more').addEventListener('click', () => { state.settings.moreFigures = !state.settings.moreFigures; update(); });
+  });
   onButton('tabs', (b) => {
     state.settings.tab = b.dataset.tab;
     save();
     renderTabs();
-    // On a phone the panels sit below the current-chord strip: bring the chosen one into view.
-    if (!window.matchMedia('(min-width: 700px) and (min-height: 600px)').matches && b.dataset.tab !== 'learn') {
-      document.querySelector('.tab-panels').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Below desktop width the panels sit under the chord cards: bring the chosen one into view.
+    if (!isDesktop() && b.dataset.tab !== 'learn') {
+      document.querySelector(`[data-tab-panel="${b.dataset.tab}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   });
+  $('staff-scroll').addEventListener('scroll', updateStaffShadow, { passive: true });
+  $('tempo').addEventListener('input', (e) => { state.settings.tempo = Number(e.target.value); save(); renderPlayer(); });
   $('quick-add').addEventListener('change', (e) => { state.settings.quickAdd = e.target.checked; update(); });
   $('figures').addEventListener('input', (e) => setInput({ figures: e.target.value }));
   $('figures').addEventListener('keydown', (e) => {
