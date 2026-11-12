@@ -8,10 +8,17 @@ let master = null;
 const voiceGains = [];
 let session = null; // { timers, nodes, onStop }
 
+// A short silent WAV. Playing it through an <audio> element moves iPhones and iPads
+// to the media audio channel, so Web Audio is heard even with the silent switch on.
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+let silentEl = null;
+
 function audio() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
+    // Safari 16.4+: treat this page's sound as media playback, not as a ringer sound.
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* not supported */ }
     ctx = new AC();
     const comp = ctx.createDynamicsCompressor();
     comp.connect(ctx.destination);
@@ -24,8 +31,34 @@ function audio() {
       voiceGains.push(g);
     }
   }
-  if (ctx.state === 'suspended') ctx.resume();
+  if (ctx.state !== 'running') ctx.resume().catch(() => {});
   return ctx;
+}
+
+/**
+ * Browsers only allow sound after the user has touched the page, and the audio must be
+ * started inside that touch. Call this from the first tap or key press: it creates and
+ * resumes the audio engine, plays one silent sample (needed by older iOS) and starts the
+ * silent <audio> element that keeps iOS on the media channel.
+ */
+export function unlock() {
+  const c = audio();
+  if (!c) return;
+  try {
+    const src = c.createBufferSource();
+    src.buffer = c.createBuffer(1, 1, 22050);
+    src.connect(c.destination);
+    src.start(0);
+  } catch { /* ignore */ }
+  if (!silentEl) {
+    silentEl = document.createElement('audio');
+    silentEl.src = SILENT_WAV;
+    silentEl.loop = true;
+    silentEl.setAttribute('playsinline', '');
+    silentEl.setAttribute('x-webkit-airplay', 'deny');
+    silentEl.preload = 'auto';
+  }
+  if (silentEl.paused) silentEl.play().catch(() => {});
 }
 
 export const soundAvailable = () => !!(window.AudioContext || window.webkitAudioContext);
@@ -41,8 +74,8 @@ function note(voice, midiNum, start, duration, nodes) {
   const end = start + Math.max(0.05, duration - 0.03);
   const env = ctx.createGain();
   env.gain.setValueAtTime(0, start);
-  env.gain.linearRampToValueAtTime(0.16, start + 0.02);
-  env.gain.setTargetAtTime(0.1, start + 0.02, 0.25);
+  env.gain.linearRampToValueAtTime(0.24, start + 0.02);
+  env.gain.setTargetAtTime(0.15, start + 0.02, 0.25);
   env.gain.setTargetAtTime(0, end, 0.03);
   const filter = ctx.createBiquadFilter();
   filter.type = 'lowpass';

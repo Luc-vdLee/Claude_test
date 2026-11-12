@@ -124,6 +124,7 @@
       <button role="tab" data-tab="keyboard" data-part="keyboard">Keyboard</button>
       <button role="tab" data-tab="line" data-part="lineEntry">Bass line</button>
       <button role="tab" data-tab="exercises" data-part="exercises">Exercises</button>
+      <button role="tab" data-tab="learn" data-part="learn">Learn</button>
       <button role="tab" data-tab="settings">Settings</button>
       <span class="tabs-title" aria-hidden="true">Figured Bass Decoder · <span id="tabs-ex"></span></span>
     </nav>
@@ -143,6 +144,7 @@
           <button id="play-btn" class="primary play-btn" title="Play the whole harmony (Space)">▶ Play</button>
           <div class="segmented voice-toggles" id="voice-toggles" aria-label="Voices to hear"></div>
           <button id="loop-toggle" class="toggle" aria-pressed="false" title="Start again at the end">⟲ Loop</button>
+          <button id="autoplay-toggle" class="toggle" aria-pressed="true" title="Play each chord as you add or change it">♪ Hear each chord</button>
           <span class="tempo" title="Tempo: 72 quarter notes per minute">72 bpm</span>
         </div>
         <details class="score-settings" id="score-settings" data-part="scoreSettings">
@@ -240,6 +242,8 @@
         </div>
         <p class="hint">Exercises save automatically as you work. Export a file to keep a copy or open it on another device.</p>
       </section>
+
+      <section id="learn" class="panel learn-panel" data-part="learn" data-tab-panel="learn" aria-label="Learn"></section>
 
       <section id="settings" class="panel settings" data-tab-panel="settings" aria-label="Settings">
         <h2>Settings</h2>
