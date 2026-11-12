@@ -1319,8 +1319,10 @@ function bind() {
     state.settings.tab = b.dataset.tab;
     save();
     renderTabs();
-    // Below desktop width the panels sit under the chord cards: bring the chosen one into view.
-    if (!isDesktop() && b.dataset.tab !== 'learn') {
+    // Desktop: the right column shows the tab from its top. Narrower: the panels sit under
+    // the chord cards, so bring the chosen one into view.
+    if (isDesktop()) document.querySelector('.pane-panels').scrollTop = 0;
+    else if (b.dataset.tab !== 'learn') {
       document.querySelector(`[data-tab-panel="${b.dataset.tab}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   });

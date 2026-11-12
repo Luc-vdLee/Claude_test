@@ -85,8 +85,9 @@ h2 { font-size: 1.15rem; }
 .pane { display: contents; }
 .card-global { order: 1; }
 .card-chord { order: 2; }
-.pane-visual > [data-tab-panel] { order: 3; }
-.tab-panels { order: 4; display: grid; gap: 12px; align-content: start; }
+.card-result { order: 3; }
+.pane-visual > [data-tab-panel] { order: 4; }
+.tab-panels { order: 5; display: grid; gap: 12px; align-content: start; }
 
 /* ---------------------------------------------------------------- cards */
 .card-title { grid-column: 1 / -1; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
@@ -116,12 +117,13 @@ h2 { font-size: 1.15rem; }
 .strip .field:last-child { margin-bottom: 0; }
 .strip .label { margin-bottom: 4px; }
 .strip-eyebrow { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); margin-bottom: 2px; }
-.col-result { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.col-result { display: flex; flex-direction: column; gap: 8px; }
+/* The result card: what the current chord is, and the Add button */
+.card-result { border: 2px solid var(--accent); padding: 12px 16px; box-shadow: 0 2px 4px rgba(0, 0, 0, .06), 0 10px 26px rgba(46, 93, 75, .14); }
 .col-result .actions { margin-top: auto; }
 @media (min-width: 700px) and (max-width: 1024px) {
   .card-chord { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 14px 20px; }
   .col-fig { border-left: 1px solid var(--line); padding-left: 20px; }
-  .col-result { grid-column: 1 / -1; }
 }
 
 /* ---------------------------------------------------------------- Figure Builder keypad */
@@ -197,31 +199,77 @@ input.invalid, textarea.invalid { border-color: var(--bad) !important; box-shado
   .layout { padding-top: 10px; }
 }
 
-/* ---------------------------------------------------------------- desktop split pane */
+/* ---------------------------------------------------------------- desktop: one screen
+   Three columns that together fill the window below the app bar; nothing scrolls the
+   page. Left: score (scrolls) with the keyboard pinned under it. Middle: the Piece and
+   Chord cards. Right: the selected tab, so choosing a tab changes what you see at once.
+   A column that holds more than fits scrolls on its own. */
 @media (min-width: 1025px) {
-  .layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(440px, 1fr); gap: 20px; align-items: start; }
-  .pane { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  /* Left: the score and keyboard stay put while the controls scroll */
-  .pane-visual {
-    position: sticky; top: var(--appbar-h); padding: 14px 0 12px; scrollbar-width: thin; overflow-y: auto;
-    max-height: calc(100vh - var(--appbar-h)); max-height: calc(100dvh - var(--appbar-h));
+  body { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+  .appbar { flex: none; }
+  .layout {
+    flex: 1; min-height: 0; width: 100%; max-width: none; padding: 12px 16px;
+    display: grid; gap: 14px; align-items: stretch;
+    grid-template-columns: clamp(330px, 26vw, 430px) minmax(0, 1fr) clamp(310px, 28vw, 480px);
   }
-  .pane-visual > [data-tab-panel] { display: block; }
-  .pane-controls { padding: 14px 0 24px; }
+  /* Left: Piece + Chord cards. Middle: score + keyboard. Right: result + tabs. */
+  .pane-input { order: 1; }
+  .pane-visual { order: 2; }
+  .pane-panels { order: 3; }
+  .pane { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+  .pane > * { flex: none; }
   .tabs [data-tab="score"], .tabs [data-tab="keyboard"] { display: none; }
   .footer { display: none; }
   .settings-credit { display: block; }
-  .strip .note-grid button, .strip .segmented button, .strip .octave-ctl button, .strip input[type="text"], .strip .fig-input-row button, #rest-toggle { min-height: 38px; padding-top: 4px; padding-bottom: 4px; }
-  .col-fig { border-top: 1px solid var(--line); padding-top: 12px; }
-  /* Score: compact header so the sticky column keeps room for the score and keyboard */
+
+  /* Left column: the score takes the room, the keyboard stays at the bottom */
+  .pane-visual { overflow: hidden; }
+  .pane-visual > [data-tab-panel] { display: block; }
+  .pane-visual > .progression-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
   .progression-panel { padding: 12px 14px; }
   .progression-panel > .panel-head { margin-bottom: 8px; }
   .progression-panel > .panel-head .row { flex-wrap: nowrap; }
-  .progression-panel .panel-head button, .progression-panel .player button { min-height: 36px; padding-top: 4px; padding-bottom: 4px; }
+  .progression-panel .panel-head button, .progression-panel .player button { min-height: 34px; padding-top: 3px; padding-bottom: 3px; }
   .progression-panel > .player { margin-bottom: 6px; }
   .progression-panel > .score-settings { margin: 4px 0 8px; }
-  .keyboard-panel { padding-top: 12px; }
+  .keyboard-panel { padding: 10px 12px; }
   .keyboard-panel h2 { display: none; }
+  .keyboard-panel .keyboard-wrap { margin-top: 0; }
+  .keyboard { max-height: 110px; }
+
+  /* Middle column: compact cards, the Add button always in reach */
+  .card-global { padding: 8px 12px 10px; }
+  .card-global .card-title { margin-bottom: 4px; }
+  .global-grid { gap: 8px 16px; }
+  .card-global .field-key { flex-basis: 100%; }
+  .field-tempo { min-width: 120px; }
+  .card-chord { padding: 10px 12px 12px; gap: 8px; }
+  .card-chord .label { font-size: .7rem; margin-bottom: 3px; }
+  .strip .field { margin-bottom: 8px; }
+  .note-grid { gap: 4px; }
+  .strip .note-grid button, .strip .segmented button, .strip .octave-ctl button, .strip input[type="text"], .strip .fig-input-row button, #rest-toggle { min-height: 34px; padding-top: 3px; padding-bottom: 3px; }
+  .bass-row { margin-top: 6px; gap: 6px; }
+  .octave-label { min-width: 48px; font-size: .95rem; }
+  .col-fig { border-top: 1px solid var(--line); padding-top: 8px; }
+  .fig-keypad { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+  .fig-keypad .key { min-height: 38px; font-size: .95rem; }
+  .fig-keypad .mod { font-size: 1.15rem; }
+  .col-fig .quick-add { margin-top: 4px; font-size: .82rem; }
+  .card-result { padding: 10px 14px; }
+  .col-result { gap: 4px; }
+  .result .chord-symbol { font-size: 1.8rem; }
+  .result .numeral { font-size: 1.45rem; }
+  .result .long-name { margin: 0 0 4px; font-size: .85rem; }
+  .result .note-chip { padding: 2px 6px; min-width: 46px; }
+  .result .note-chip .n { font-size: 1rem; }
+  .col-result .actions { margin-top: 4px; }
+  .col-result .actions .primary { min-height: 40px; }
+
+  /* Right column: the selected tab */
+  .pane-panels .tab-panels { gap: 10px; }
+  body.learning .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+  body.learning .pane-visual { order: 1; }
+  body.learning .pane-input { display: none; }
 }
 
 .panel {
@@ -518,7 +566,7 @@ body.quick-editing .footer { padding-bottom: 300px; }
 }
 
 /* ---------------------------------------------------------------- Learn tab */
-.learning .strip, .learning .card-global, .learning .quick-edit { display: none !important; }
+.learning .strip, .learning .card-global, .learning .card-result, .learning .quick-edit { display: none !important; }
 .learn-panel.active { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; }
 .learn-panel h2 { font-size: 1.5rem; }
 .learn-panel h3 { font-family: var(--serif); font-weight: 600; font-size: 1.1rem; margin: 0 0 8px; }
