@@ -1263,7 +1263,15 @@ function bind() {
   onButton('figure-buttons', pickFigure);
   onButton('figure-more', pickFigure);
   $('fig-more').addEventListener('click', () => { state.settings.moreFigures = !state.settings.moreFigures; update(); });
-  onButton('tabs', (b) => { state.settings.tab = b.dataset.tab; save(); renderTabs(); });
+  onButton('tabs', (b) => {
+    state.settings.tab = b.dataset.tab;
+    save();
+    renderTabs();
+    // On a phone the panels sit below the current-chord strip: bring the chosen one into view.
+    if (!window.matchMedia('(min-width: 700px) and (min-height: 600px)').matches && b.dataset.tab !== 'learn') {
+      document.querySelector('.tab-panels').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
   $('quick-add').addEventListener('change', (e) => { state.settings.quickAdd = e.target.checked; update(); });
   $('figures').addEventListener('input', (e) => setInput({ figures: e.target.value }));
   $('figures').addEventListener('keydown', (e) => {
