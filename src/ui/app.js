@@ -1016,7 +1016,14 @@ function renderProgression(model) {
     color,
     selectedOf: (i, si) => practice && state.practice.sel?.event === i && state.practice.sel?.stage === si,
   });
-  renderScore($('staff'), { ...score, singleLine: isPhone(), onSelect: (hit) => (practice ? placeFromStaff(hit) : selectEvent(hit.event)) });
+  // Desktop: shrink the notation so two lines fit the space under the toolbar.
+  let fitHeight = null;
+  if (isDesktop()) {
+    const wrap = $('staff-wrap');
+    const panel = wrap.closest('.progression-panel');
+    fitHeight = panel.getBoundingClientRect().bottom - wrap.getBoundingClientRect().top - 14;
+  }
+  renderScore($('staff'), { ...score, fitHeight, singleLine: isPhone(), onSelect: (hit) => (practice ? placeFromStaff(hit) : selectEvent(hit.event)) });
   if (isPhone() && model.focus != null) {
     // One long line on a phone: keep the chord being worked on in view.
     const hit = $('staff').querySelector(`.chord-hit[data-event="${model.focus}"]`);
@@ -1319,8 +1326,10 @@ function bind() {
     state.settings.tab = b.dataset.tab;
     save();
     renderTabs();
-    // Below desktop width the panels sit under the chord cards: bring the chosen one into view.
-    if (!isDesktop() && b.dataset.tab !== 'learn') {
+    // Desktop: the right column shows the tab from its top. Narrower: the panels sit under
+    // the chord cards, so bring the chosen one into view.
+    if (isDesktop()) document.querySelector('.pane-panels').scrollTop = 0;
+    else if (b.dataset.tab !== 'learn') {
       document.querySelector(`[data-tab-panel="${b.dataset.tab}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   });
