@@ -18,6 +18,17 @@
   </header>
 
   <main class="layout">
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
+      <button role="tab" data-tab="score">Score</button>
+      <button role="tab" data-tab="voicing" data-part="voicePanel">Voicing</button>
+      <button role="tab" data-tab="keyboard" data-part="keyboard">Keyboard</button>
+      <button role="tab" data-tab="line" data-part="lineEntry">Bass line</button>
+      <button role="tab" data-tab="exercises" data-part="exercises">Exercises</button>
+      <button role="tab" data-tab="learn" data-part="learn">Learn</button>
+      <button role="tab" data-tab="settings">Settings</button>
+      <span class="tabs-title" aria-hidden="true">Figured Bass Decoder · <span id="tabs-ex"></span></span>
+    </nav>
+
     <section class="panel input-panel strip" aria-label="Current chord">
       <div class="strip-col col-bass">
         <div class="field">
@@ -117,17 +128,6 @@
         </div>
       </div>
     </section>
-
-    <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
-      <button role="tab" data-tab="score">Score</button>
-      <button role="tab" data-tab="voicing" data-part="voicePanel">Voicing</button>
-      <button role="tab" data-tab="keyboard" data-part="keyboard">Keyboard</button>
-      <button role="tab" data-tab="line" data-part="lineEntry">Bass line</button>
-      <button role="tab" data-tab="exercises" data-part="exercises">Exercises</button>
-      <button role="tab" data-tab="learn" data-part="learn">Learn</button>
-      <button role="tab" data-tab="settings">Settings</button>
-      <span class="tabs-title" aria-hidden="true">Figured Bass Decoder · <span id="tabs-ex"></span></span>
-    </nav>
 
     <div class="tab-panels">
       <section class="panel progression-panel" data-tab-panel="score" aria-label="Score">
