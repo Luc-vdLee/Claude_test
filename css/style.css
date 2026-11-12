@@ -60,53 +60,81 @@ h2 { font-size: 1.15rem; }
 
 .topbar {
   display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
-  max-width: 1400px; margin: 0 auto; padding: 14px 16px 8px;
+  padding: 14px 0 0; order: -1;
 }
 .topbar-ex { color: var(--muted); }
 
+/* ---------------------------------------------------------------- page layout
+   Phone and tablet: one column. The two panes dissolve (display: contents) and their
+   parts are ordered: tabs, Piece card, Chord card, score/keyboard, other tab panels.
+   Desktop (wider than 1024px): two columns, the score and keyboard sticky on the left. */
 .layout {
-  max-width: 1400px; margin: 0 auto; padding: 0 16px 16px;
+  max-width: 1560px; margin: 0 auto; padding: 0 16px 16px;
   display: flex; flex-direction: column; gap: 10px;
 }
+.pane { display: contents; }
+.layout .tabs { order: 0; }
+.card-global { order: 1; }
+.card-chord { order: 2; }
+.pane-visual > [data-tab-panel] { order: 3; }
+.tab-panels { order: 4; display: grid; gap: 12px; align-content: start; }
 
-/* The current-chord strip: bass, figures and result side by side */
-.strip { border: 2px solid var(--accent); padding: 14px 18px; display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+/* ---------------------------------------------------------------- cards */
+.card-title { grid-column: 1 / -1; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+
+/* Card 1, Piece: set once, rarely changed, so it stays quiet */
+.card-global { background: var(--info-soft); box-shadow: none; padding: 10px 16px 12px; }
+.card-global .card-title { margin-bottom: 6px; }
+.global-grid { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: flex-start; }
+.card-global .field { margin-bottom: 0; }
+.card-global .label { margin-bottom: 4px; }
+.card-global select, .card-global .segmented button { min-height: 36px; padding-top: 4px; padding-bottom: 4px; }
+.timesig-row { align-items: flex-end; }
+.field-tempo { display: flex; flex-direction: column; min-width: 150px; flex: 1; max-width: 240px; }
+.field-tempo input[type="range"] { width: 100%; min-height: 36px; accent-color: var(--accent); }
+.tempo-val { text-transform: none; letter-spacing: 0; color: var(--ink); font-weight: 600; margin-left: 4px; }
+.card-global .keysig-row { margin-top: 8px; max-width: 360px; }
+
+/* Card 2, Chord: what you're working on now, so it gets the weight */
+.card-chord {
+  border: 2px solid var(--accent); padding: 14px 18px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .06), 0 14px 34px rgba(46, 93, 75, .18);
+  display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr);
+}
+.card-chord .card-title { color: var(--accent); }
 .strip-col { min-width: 0; }
 .strip .field { margin-bottom: 10px; }
 .strip .field:last-child { margin-bottom: 0; }
 .strip .label { margin-bottom: 4px; }
 .strip-eyebrow { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); margin-bottom: 2px; }
-.col-result { display: flex; flex-direction: column; gap: 8px; }
+.col-result { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
 .col-result .actions { margin-top: auto; }
-@media (min-width: 700px) {
-  .strip { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px 20px; }
+@media (min-width: 700px) and (max-width: 1024px) {
+  .card-chord { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 14px 20px; }
   .col-fig { border-left: 1px solid var(--line); padding-left: 20px; }
-  .col-result { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 10px; }
-}
-@media (min-width: 1100px) {
-  .strip { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr); }
-  .col-result { grid-column: auto; border-top: 0; padding-top: 0; border-left: 1px solid var(--line); padding-left: 20px; }
+  .col-result { grid-column: 1 / -1; }
 }
 
-/* Figures: one row of common ones, the rest under More */
-.fig-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; position: relative; }
-.fig-head .help { margin: 0; font-size: .85rem; }
-.fig-head .help ul {
-  position: absolute; right: 0; top: 100%; z-index: 10; width: min(440px, calc(100vw - 32px));
-  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, .16); padding: 12px 14px 8px 30px; color: var(--ink);
+/* ---------------------------------------------------------------- Figure Builder keypad */
+.fig-keypad { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.fig-keypad .key {
+  min-height: 48px; padding: 4px 2px; font-family: var(--serif); font-size: 1.02rem;
+  display: flex; align-items: center; justify-content: center;
 }
-.fig-input-row { margin-bottom: 8px; }
-.col-fig .quick-add { margin-bottom: 10px; }
-.fig-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: start; }
-.strip .figure-buttons { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 6px; }
-.strip .figure-buttons button { min-height: 46px; }
-.fig-more { min-height: 46px; padding: 4px 10px; border-style: dashed; font-size: .9rem; white-space: nowrap; }
-.fig-more.has-sel { border-color: var(--accent); background: var(--accent-soft); }
-.figure-more { border-top: 1px dashed var(--line); padding-top: 6px; }
-.figure-more[hidden] { display: none; }
+.fig-keypad .key[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.fig-keypad .mod { font-size: 1.3rem; background: var(--info-soft); }
+.fig-keypad .mod[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.fig-keypad .linear { font-size: .95rem; }
+@media (min-width: 480px) { .fig-keypad { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+.keypad-hint { margin: 6px 0 0; font-size: .82rem; color: var(--accent); min-height: 0; }
+.keypad-hint:empty { display: none; }
+.fig-input-row { margin-top: 2px; }
+input.invalid, textarea.invalid { border-color: var(--bad) !important; box-shadow: 0 0 0 3px var(--bad-soft); outline-color: var(--bad); }
+.field-error { color: var(--bad); font-size: .82rem; margin-top: 4px; }
+.field-error:empty { display: none; }
+.col-fig .quick-add { margin-top: 8px; font-size: .9rem; }
 
-/* Compact result in the strip */
+/* Compact result in the chord card */
 .result .result-eyebrow { font-size: .8rem; }
 .result .chord-symbol { font-size: 2.2rem; }
 .result .numeral { font-size: 1.7rem; }
@@ -118,44 +146,46 @@ h2 { font-size: 1.15rem; }
 .result .callouts { margin-top: 8px; }
 .result .callout { padding: 6px 8px; font-size: .85rem; }
 
-/* Tabs */
-.tabs { display: flex; gap: 4px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; flex: none; }
-.tabs button { border: 0; background: transparent; color: var(--muted); font-weight: 500; padding: 8px 16px; white-space: nowrap; }
+/* ---------------------------------------------------------------- tabs */
+.tabs { display: flex; gap: 4px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; flex: none; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button { border: 0; background: transparent; color: var(--muted); font-weight: 500; padding: 8px 16px; white-space: nowrap; flex: none; }
 .tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
-.tab-panels { display: grid; gap: 12px; align-content: start; }
 [data-tab-panel] { display: none; }
 [data-tab-panel].active { display: block; }
 .keyboard-panel h2, .line-panel h2, .exercises h2 { margin-bottom: 10px; }
 .tabs-title { display: none; }
 .settings-credit { display: none; }
-/* Phone: the page scrolls, so the tab bar stays pinned to the top */
-@media not ((min-width: 700px) and (min-height: 600px)) {
+
+/* Phone and tablet: the page scrolls, so the tab bar stays pinned to the top */
+@media (max-width: 1024px) {
   .tabs { position: sticky; top: 0; z-index: 20; box-shadow: 0 2px 10px rgba(0, 0, 0, .08); }
-  .tab-panels { scroll-margin-top: 64px; }
+  [data-tab-panel] { scroll-margin-top: 64px; }
 }
 
-/* Computer and iPad: everything on one screen, only the tab content scrolls */
-@media (min-width: 700px) and (min-height: 600px) {
-  body { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
-  /* The title moves into the tab bar to save a line */
-  .topbar { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; padding: 0; }
-  .layout { padding-top: 10px; }
-  .tabs-title { display: block; margin-left: auto; align-self: center; padding: 0 10px; color: var(--muted); font-family: var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .tabs-title, .tabs button { flex: none; }
+/* ---------------------------------------------------------------- desktop split pane */
+@media (min-width: 1025px) {
+  .layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(440px, 1fr); gap: 20px; align-items: start; }
+  .pane { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  /* Left: the score and keyboard stay put while the controls scroll */
+  .pane-visual { position: sticky; top: 0; max-height: 100vh; max-height: 100dvh; overflow-y: auto; padding-bottom: 12px; scrollbar-width: thin; }
+  .pane-visual .topbar { padding-bottom: 0; }
+  .pane-visual > [data-tab-panel] { display: block; }
+  .pane-controls { padding: 14px 0 24px; }
+  .tabs [data-tab="score"], .tabs [data-tab="keyboard"] { display: none; }
   .footer { display: none; }
   .settings-credit { display: block; }
-  .strip .note-grid button, .strip .segmented button, .strip .octave-ctl button, .strip select, .strip input[type="text"], .strip .fig-input-row button, #rest-toggle { min-height: 38px; padding-top: 4px; padding-bottom: 4px; }
-  .strip .figure-buttons button, .fig-more { min-height: 44px; }
-  /* Score tab: the player sits on the same line as the score buttons */
-  .progression-panel.active { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 16px; align-items: center; }
-  .progression-panel > * { grid-column: 1 / -1; }
-  .progression-panel > .panel-head { grid-column: 2; grid-row: 1; margin: 0; justify-content: flex-end; }
-  .progression-panel > .panel-head h2 { display: none; }
-  .progression-panel > .player { grid-column: 1; grid-row: 1; margin: 0; }
-  .progression-panel > .score-settings { margin: 8px 0; }
-  .layout { flex: 1; min-height: 0; width: 100%; padding-bottom: 6px; }
-  .strip { flex: none; max-height: 56vh; overflow-y: auto; }
-  .tab-panels { flex: 1; min-height: 0; overflow-y: auto; }
+  .strip .note-grid button, .strip .segmented button, .strip .octave-ctl button, .strip input[type="text"], .strip .fig-input-row button, #rest-toggle { min-height: 38px; padding-top: 4px; padding-bottom: 4px; }
+  .col-fig { border-top: 1px solid var(--line); padding-top: 12px; }
+  /* Score: compact header so the sticky column keeps room for the score and keyboard */
+  .progression-panel { padding: 12px 14px; }
+  .progression-panel > .panel-head { margin-bottom: 8px; }
+  .progression-panel > .panel-head .row { flex-wrap: nowrap; }
+  .progression-panel .panel-head button, .progression-panel .player button { min-height: 36px; padding-top: 4px; padding-bottom: 4px; }
+  .progression-panel > .player { margin-bottom: 6px; }
+  .progression-panel > .score-settings { margin: 4px 0 8px; }
+  .keyboard-panel { padding-top: 12px; }
+  .keyboard-panel h2 { display: none; }
 }
 
 .panel {
@@ -271,8 +301,21 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: 
 .why-table td.why-parts { color: var(--muted); }
 
 /* Progression */
-.staff-wrap { overflow-x: auto; background: var(--paper); border-radius: 8px; border: 1px solid var(--line); }
-#staff { min-height: 260px; }
+.staff-wrap { position: relative; background: var(--paper); border-radius: 8px; border: 1px solid var(--line); overflow: hidden; }
+.staff-scroll { overflow-x: auto; white-space: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.staff-scroll::-webkit-scrollbar { display: none; }
+/* Shade on the right edge while more of the score is hidden: "swipe for more" */
+.staff-wrap::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 36px; pointer-events: none;
+  box-shadow: inset -22px 0 18px -16px rgba(42, 37, 32, .38); opacity: 0; transition: opacity .2s;
+}
+.staff-wrap.more-right::after { opacity: 1; }
+#staff { min-height: 260px; position: relative; display: inline-block; min-width: 100%; vertical-align: top; }
+/* Click targets over each chord of the score */
+.chord-hits { position: absolute; inset: 0; pointer-events: none; }
+.chord-hit { position: absolute; pointer-events: auto; cursor: pointer; border-radius: 8px; transition: background-color .12s; }
+.chord-hit:hover { background: rgba(46, 93, 75, .09); box-shadow: inset 0 0 0 1px rgba(46, 93, 75, .22); }
+@media (hover: none) { .chord-hit:active { background: rgba(46, 93, 75, .14); } }
 #staff svg { display: block; }
 .history { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .history button { padding: 4px 10px; min-height: 36px; text-align: left; }
@@ -431,8 +474,7 @@ body.quick-editing .footer { padding-bottom: 300px; }
 /* Phone: bigger targets and the Add button always in reach */
 @media (max-width: 600px) {
   .note-grid button { min-height: 50px; font-size: 1.2rem; }
-  .figure-buttons { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-  .figure-buttons button { min-height: 54px; font-size: 1.05rem; }
+  .fig-keypad .key { min-height: 52px; font-size: 1.08rem; }
   .actions { position: sticky; bottom: 0; z-index: 5; background: var(--panel); padding: 8px 0; margin: 0 -4px; }
   .actions .primary { min-height: 50px; }
   .quick-edit { bottom: 0; width: 100%; border-radius: var(--radius) var(--radius) 0 0; border-bottom: 0; }
@@ -440,7 +482,7 @@ body.quick-editing .footer { padding-bottom: 300px; }
 }
 
 /* ---------------------------------------------------------------- Learn tab */
-.learning .strip, .learning .quick-edit { display: none !important; }
+.learning .strip, .learning .card-global, .learning .quick-edit { display: none !important; }
 .learn-panel.active { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; }
 .learn-panel h2 { font-size: 1.5rem; }
 .learn-panel h3 { font-family: var(--serif); font-weight: 600; font-size: 1.1rem; margin: 0 0 8px; }
