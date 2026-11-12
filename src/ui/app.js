@@ -1662,7 +1662,16 @@ function renderLessonDecoder() {
       color: k === sel ? PREVIEW_COLOR : undefined,
       stages: c.decoded.stages.map((_, si) => ({ figures: c.decoded.written[si] ?? [], numeral: si === 0 ? shortNumeral(c.decoded) : '' })),
     }];
-    renderScore($(`ld-staff-${k}`), { bars, timeSig: { num: 2, den: 4 }, events, emptyKey: c.d.keySig, noTimeSig: true, layoutWidth: 210, scale: 0.72 });
+    renderScore($(`ld-staff-${k}`), { bars, timeSig: { num: 2, den: 4 }, events, emptyKey: c.d.keySig, noTimeSig: true, layoutWidth: 240 });
+    // Crop the drawing to the notes themselves so the chord fills its card.
+    const svg = $(`ld-staff-${k}`).querySelector('svg');
+    if (svg) {
+      const b = svg.getBBox();
+      svg.setAttribute('viewBox', `${b.x - 6} ${b.y - 6} ${b.width + 12} ${b.height + 12}`);
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+      svg.style.cssText = '';
+    }
   });
 }
 
