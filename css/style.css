@@ -676,3 +676,12 @@ body.quick-editing .footer { padding-bottom: 300px; }
 .missed-list p { margin: 0 0 4px; }
 .fig-inline { font-family: var(--serif); font-weight: 700; }
 .callout.learn-task { margin-top: 12px; }
+
+/* Safety-net note shown when part of the page hit an error. */
+.problem-note {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 100;
+  max-width: min(560px, calc(100vw - 32px)); padding: 10px 14px; border-radius: 8px;
+  background: #fbebeb; color: #7a1d17; border: 1px solid #e3b4b0; font-size: 14px; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.problem-note[hidden] { display: none; }

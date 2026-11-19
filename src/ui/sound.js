@@ -6,13 +6,34 @@ import { frequency } from '../theory/playback.js';
 let ctx = null;
 let master = null;
 const voiceGains = [];
+let wantedVoices = [true, true, true, true];
 let session = null; // { timers, nodes, onStop }
 
-// A short silent WAV. Playing it through an <audio> element moves iPhones and iPads
-// to the media audio channel, so Web Audio is heard even with the silent switch on.
-const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+// Sound starts only from a button press (Play, adding a chord, Hear): nothing here runs on
+// its own, and no audio exists until the first such press.
+//
+// iPhone and iPad: Web Audio is muted by the silent switch unless a media element plays at
+// the same time. So while (and only while) the app makes sound, a short silent clip plays on
+// a loop. It holds half a second of real silence: a clip of zero length on a loop makes the
+// browser restart it thousands of times a second and keeps the page busy.
+const SILENT_WAV = (() => {
+  const samples = 4000; // 0.5 s at 8 kHz, 8-bit mono
+  const bytes = new Uint8Array(44 + samples);
+  const view = new DataView(bytes.buffer);
+  const text = (at, str) => { for (let i = 0; i < str.length; i++) bytes[at + i] = str.charCodeAt(i); };
+  text(0, 'RIFF'); view.setUint32(4, 36 + samples, true); text(8, 'WAVEfmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, 8000, true); view.setUint32(28, 8000, true); view.setUint16(32, 1, true); view.setUint16(34, 8, true);
+  text(36, 'data'); view.setUint32(40, samples, true);
+  bytes.fill(128, 44); // 8-bit silence
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return `data:audio/wav;base64,${btoa(bin)}`;
+})();
 let silentEl = null;
+let silentTimer = null;
 
+/** The audio engine, created on the first sound request (which is always a button press). */
 function audio() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -27,6 +48,7 @@ function audio() {
     master.connect(comp);
     for (let v = 0; v < 4; v++) {
       const g = ctx.createGain();
+      g.gain.value = wantedVoices[v] ? 1 : 0;
       g.connect(master);
       voiceGains.push(g);
     }
@@ -35,21 +57,8 @@ function audio() {
   return ctx;
 }
 
-/**
- * Browsers only allow sound after the user has touched the page, and the audio must be
- * started inside that touch. Call this from the first tap or key press: it creates and
- * resumes the audio engine, plays one silent sample (needed by older iOS) and starts the
- * silent <audio> element that keeps iOS on the media channel.
- */
-export function unlock() {
-  const c = audio();
-  if (!c) return;
-  try {
-    const src = c.createBufferSource();
-    src.buffer = c.createBuffer(1, 1, 22050);
-    src.connect(c.destination);
-    src.start(0);
-  } catch { /* ignore */ }
+/** Keep the silent clip playing for `ms` (or until releaseMedia), so iOS plays the sound. */
+function holdMedia(ms = null) {
   if (!silentEl) {
     silentEl = document.createElement('audio');
     silentEl.src = SILENT_WAV;
@@ -58,14 +67,24 @@ export function unlock() {
     silentEl.setAttribute('x-webkit-airplay', 'deny');
     silentEl.preload = 'auto';
   }
+  clearTimeout(silentTimer);
+  // While the whole harmony plays, the clip runs until stop().
+  silentTimer = ms == null || session ? null : setTimeout(releaseMedia, ms);
   if (silentEl.paused) silentEl.play().catch(() => {});
+}
+
+function releaseMedia() {
+  clearTimeout(silentTimer);
+  silentTimer = null;
+  if (silentEl && !silentEl.paused) silentEl.pause();
 }
 
 export const soundAvailable = () => !!(window.AudioContext || window.webkitAudioContext);
 
-/** Which voices are heard: [bass, tenor, alto, soprano]. Takes effect at once. */
+/** Which voices are heard: [bass, tenor, alto, soprano]. Takes effect at once (makes no sound). */
 export function setVoices(on) {
-  if (!audio()) return;
+  wantedVoices = [...on];
+  if (!ctx) return;
   on.forEach((v, i) => voiceGains[i].gain.setTargetAtTime(v ? 1 : 0, ctx.currentTime, 0.015));
 }
 
@@ -103,6 +122,7 @@ function note(voice, midiNum, start, duration, nodes) {
 export function play({ notes, events, length }, { loop = () => false, onEvent = () => {}, onStop = () => {} } = {}) {
   stop();
   if (!audio() || !notes.length) { onStop(); return; }
+  holdMedia();
   const s = { timers: [], nodes: [], onStop };
   session = s;
   const pass = (t0) => {
@@ -125,12 +145,14 @@ export function play({ notes, events, length }, { loop = () => false, onEvent = 
 /** Play a single chord (midi numbers, bass first) for `seconds`. */
 export function playChord(midis, seconds = 1.2) {
   if (!audio()) return;
+  holdMedia((seconds + 0.5) * 1000);
   const t0 = ctx.currentTime + 0.03;
   midis.forEach((m, v) => { if (m != null) note(v, m, t0, seconds, []); });
 }
 
 export function stop() {
   const s = session;
+  releaseMedia();
   if (!s) return;
   session = null;
   s.timers.forEach(clearTimeout);

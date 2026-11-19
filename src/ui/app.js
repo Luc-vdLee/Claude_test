@@ -374,6 +374,7 @@ function placeFromKey(m) {
   const sel = state.practice.sel;
   if (!sel) return;
   const e = state.progression[sel.event];
+  if (!e || e.rest) return;
   const model = compute();
   const spec = model.voiced[sel.event]?.[sel.stage]?.spec;
   setUserNote(sel.event, sel.stage, state.practice.voice, spellMidi(m, spec, entryKey(e)));
@@ -385,6 +386,7 @@ function changeSelectedNote(fn) {
   const sel = state.practice.sel;
   if (!sel) return;
   const e = state.progression[sel.event];
+  if (!e || e.rest) return;
   const note = userNotes(e, sel.stage)[state.practice.voice];
   if (!note) return;
   setUserNote(sel.event, sel.stage, state.practice.voice, fn(note, e));
@@ -1155,17 +1157,58 @@ function suggestLine() {
 
 function update() {
   if (playing && playing.signature !== JSON.stringify(state.progression)) sound.stop();
+  dropStaleSelection();
   save();
-  renderExercises();
-  renderControls();
-  const model = compute();
-  renderOctave(model);
-  renderLine();
-  renderResult(model);
-  renderVoiceLeading(model);
-  renderProgression(model);
-  renderQuickEdit(model);
+  safely(renderExercises);
+  safely(renderControls);
+  let model;
+  try {
+    model = compute();
+  } catch (err) {
+    showProblem(err);
+    return;
+  }
+  for (const part of [renderOctave, renderLine, renderResult, renderVoiceLeading, renderProgression, renderQuickEdit]) {
+    safely(() => part(model));
+  }
 }
+
+/** Practice mode: forget a selected chord that was undone, cleared or deleted. */
+function dropStaleSelection() {
+  const sel = state.practice.sel;
+  const e = sel && state.progression[sel.event];
+  if (sel && (!e || e.rest)) state.practice.sel = null;
+}
+
+/**
+ * Safety net: an error in one part of the page is logged and shown in a small note,
+ * and the other parts still update, so the app never locks up.
+ */
+function safely(fn) {
+  try {
+    fn();
+  } catch (err) {
+    showProblem(err);
+  }
+}
+
+function showProblem(err) {
+  console.error(err);
+  let note = document.getElementById('problem-note');
+  if (!note) {
+    note = document.createElement('div');
+    note.id = 'problem-note';
+    note.className = 'problem-note';
+    note.setAttribute('role', 'status');
+    document.body.append(note);
+    note.addEventListener('click', () => { note.hidden = true; });
+  }
+  note.textContent = 'Something went wrong in part of the page. The rest still works; undo the last step if something looks off. (Tap to close)';
+  note.hidden = false;
+}
+
+window.addEventListener('error', (e) => showProblem(e.error ?? e.message));
+window.addEventListener('unhandledrejection', (e) => showProblem(e.reason));
 
 // ---------------------------------------------------------------- quick edit
 
@@ -1195,7 +1238,6 @@ function saveEdit() {
   if (t.type !== 'edit' || !compute().inputValid) { update(); return; }
   state.progression[t.index] = { ...inputEntry(), user: state.progression[t.index].user };
   update();
-  autoPlayChord(t.index);
 }
 
 /** Move the bass a step up or down (by the key signature), keeping a fixed octave in step. */
@@ -1383,11 +1425,6 @@ function bind() {
   $('hear-chord').addEventListener('click', hearChord);
   $('qe-hear').addEventListener('click', hearChord);
   $('autoplay-toggle').addEventListener('click', () => { state.settings.sound.autoPlay = !state.settings.sound.autoPlay; save(); renderPlayer(); });
-  // Sound may only start after the first touch or key press, so unlock it then.
-  const unlockSound = () => { if (state.settings.show.sound) sound.unlock(); };
-  document.addEventListener('pointerdown', unlockSound, { capture: true });
-  document.addEventListener('keydown', unlockSound, { capture: true });
-  document.addEventListener('touchend', unlockSound, { capture: true });
   $('loop-toggle').addEventListener('click', () => { state.settings.sound.loop = !state.settings.sound.loop; save(); renderPlayer(); });
   onButton('voice-toggles', (b) => {
     const voices = state.settings.sound.voices;
@@ -1458,7 +1495,7 @@ function bind() {
     else if (b.dataset.acc !== undefined) changeSelectedNote((n) => ({ ...n, acc: Number(b.dataset.acc) }));
     else if (b.id === 'practice-clear' && p.sel) {
       const entry = state.progression[p.sel.event];
-      if (entry.user?.[p.sel.stage]) entry.user[p.sel.stage] = [null, null, null, null];
+      if (entry?.user?.[p.sel.stage]) entry.user[p.sel.stage] = [null, null, null, null];
       p.voice = 3;
       update();
     } else if (b.id === 'practice-check') { p.checked = !p.checked; update(); }
