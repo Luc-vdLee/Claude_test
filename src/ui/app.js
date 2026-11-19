@@ -817,7 +817,7 @@ function whyVoicingHTML(stages) {
   if (!blocks) return '';
   return `<details class="help why-voicing"${whyVoicingOpen ? ' open' : ''}>
     <summary>Why this voicing?</summary>
-    <p>The app tries every four-part voicing that fits the voice ranges. Each one gets penalty points for every rule it bends (parallels, unresolved tendency tones, big leaps, doubling, spacing), and the lowest total wins. These are the best candidates it found; ✓ marks the one in use.</p>
+    <p>The app tries every four-part voicing that fits the voice ranges. Each one gets penalty points for every rule it bends (parallels, unresolved tendency tones, upper voices moving more than a 3rd, common tones not kept in the same voice, moving with the bass when the chords share no note, doubling, spacing), and the lowest total wins. These are the best candidates it found; ✓ marks the one in use.</p>
     ${blocks}
   </details>`;
 }

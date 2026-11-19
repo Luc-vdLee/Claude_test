@@ -69,3 +69,28 @@ test('empty upper voices become invisible placeholders in the score', () => {
   assert.equal(built.voices[2][0].ghost, false);
   assert.equal(built.voices[0][0].note.letter, 0);
 });
+
+test('voice-leading guidelines: common tones, leaps beyond a 3rd, contrary motion', () => {
+  // I to IV: C is in both chords. Holding it in the soprano is clean; leaving it is noted.
+  const one = voicing('C3', 'E4', 'G4', 'C5');
+  const prevOne = { spec: spec('C', ''), midis: one.map(midi) };
+  const held = checkVoicing(spec('F', ''), voicing('F3', 'F4', 'A4', 'C5'), prevOne);
+  assert.ok(!texts(held).some((t) => t.includes('in both chords')), texts(held).join('; '));
+  const left = checkVoicing(spec('F', ''), voicing('F3', 'F4', 'A4', 'A5'), prevOne);
+  assert.ok(texts(left).some((t) => t.includes('Soprano: C is in both chords')), texts(left).join('; '));
+  assert.ok(texts(left).some((t) => t.includes('Soprano leaps a 6th')), texts(left).join('; '));
+
+  // IV to V share no note: upper voices moving up with the bass are noted.
+  const four = voicing('F3', 'F4', 'A4', 'C5');
+  const prevFour = { spec: spec('F', ''), midis: four.map(midi) };
+  const against = checkVoicing(spec('G', ''), voicing('G3', 'D4', 'G4', 'B4'), prevFour);
+  assert.ok(!texts(against).some((t) => t.includes('same way as the bass')), texts(against).join('; '));
+  const along = checkVoicing(spec('G', ''), voicing('G3', 'G4', 'B4', 'D5'), prevFour);
+  assert.ok(texts(along).some((t) => t.includes('same way as the bass')), texts(along).join('; '));
+});
+
+test('a melodic 7th is a warning', () => {
+  const a = voicing('C3', 'E4', 'G4', 'C5');
+  const r = checkVoicing(spec('G', ''), voicing('G2', 'D4', 'G4', 'B5'), { spec: spec('C', ''), midis: a.map(midi) });
+  assert.ok(r.issues.some((i) => i.level === 'warn' && i.text.includes('leaps a 7th')), texts(r).join('; '));
+});

@@ -2,9 +2,17 @@
 //
 // For every chord all voicings within the voice ranges are listed and scored.
 // The score adds up penalties for poor doubling and spacing and, against the
-// previous chord, for large motion, parallel/direct 5ths and octaves, unresolved
-// tendency tones (leading tone, 7ths, suspensions, augmented 6ths) and
+// previous chord, for large motion, upper voices that move more than a 3rd,
+// common tones that are not kept in the same voice, upper voices that move with
+// the bass when the chords share no note, parallel/direct 5ths and octaves,
+// unresolved tendency tones (leading tone, 7ths, suspensions, augmented 6ths) and
 // augmented melodic intervals. The lowest score wins; the rest are alternatives.
+//
+// The motion rules follow the usual guidelines (e.g. Berklee's "voice leading
+// rules"): keep common tones in the same voice, move the other voices by step if
+// possible, move no upper voice more than a 3rd; the bass may leap freely. When two
+// chords share no note, the traditional (classical) solution moves the upper voices
+// against the bass.
 
 import { pc, midi, noteName, spellingKey, sameSpelling, withOctave, intervalName } from './pitch.js';
 
@@ -113,11 +121,13 @@ function entryFor(spec, midi) {
 
 function transitionCost(prevSpec, prev, spec, cur, issues, parts) {
   let cost = 0;
+  const dB = cur[0] - prev[0];
 
   for (let v = 1; v < 4; v++) {
     const d = Math.abs(cur[v] - prev[v]);
     cost += tally(parts, 'Motion', d);
-    if (d > 5) cost += tally(parts, 'Leaps', (d - 5) * 2);
+    // Upper voices: held, by step or by a 3rd at most (a 3rd is up to 4 semitones).
+    if (d > 4) cost += tally(parts, 'Leaps', (d - 4) * 2);
     if (d > 12) {
       cost += tally(parts, 'Leaps', 30);
       issues?.push({ level: 'warn', text: `${VOICES[v]} leaps more than an octave.` });
@@ -132,12 +142,38 @@ function transitionCost(prevSpec, prev, spec, cur, issues, parts) {
     const ci = (((cur[j] - cur[i]) % 12) + 12) % 12;
     if (pi === ci && (ci === 0 || ci === 7)) {
       cost += tally(parts, 'Parallels', 100);
-      issues?.push({ level: 'error', text: `Parallel ${ci === 7 ? '5ths' : 'octaves'}: ${VOICES[j]} and ${VOICES[i]}.` });
+      const contrary = Math.sign(cur[i] - prev[i]) !== Math.sign(cur[j] - prev[j]);
+      const what = ci === 7 ? '5ths' : 'octaves';
+      issues?.push({ level: 'error', text: contrary
+        ? `Consecutive ${what} by contrary motion: ${VOICES[j]} and ${VOICES[i]}.`
+        : `Parallel ${what}: ${VOICES[j]} and ${VOICES[i]}.` });
+    }
+  }
+
+  // Common tones: a note both chords share stays in the same upper voice.
+  const curPcs = new Set(spec.map((e) => e.pc));
+  const prevPcs = new Set(prevSpec.map((e) => e.pc));
+  const shared = [...curPcs].filter((x) => prevPcs.has(x));
+  for (let v = 1; v < 4; v++) {
+    const from = entryFor(prevSpec, prev[v]);
+    if (!from || from.tendency || cur[v] === prev[v] || !curPcs.has(from.pc)) continue;
+    cost += tally(parts, 'Common tone', 3);
+    issues?.push({ level: 'info', text: `${VOICES[v]}: ${noteName(from.note)} is in both chords; keeping it in the same voice is smoothest.` });
+  }
+
+  // No common tone and the bass moves by step (e.g. IV–V): the upper voices move against the bass.
+  if (shared.length === 0 && dB !== 0 && Math.abs(dB) <= 2) {
+    for (let v = 1; v < 4; v++) {
+      const d = cur[v] - prev[v];
+      if (d === 0 || Math.sign(d) !== Math.sign(dB)) continue;
+      const from = entryFor(prevSpec, prev[v]);
+      if (from?.tendency && Math.sign(d) === from.tendency) continue; // resolving as it must
+      cost += tally(parts, 'Contrary motion', 3);
+      issues?.push({ level: 'info', text: `${VOICES[v]} moves the same way as the bass; with no common tone, move the upper voices against the bass.` });
     }
   }
 
   const dS = cur[3] - prev[3];
-  const dB = cur[0] - prev[0];
   const outer = (((cur[3] - cur[0]) % 12) + 12) % 12;
   if (dS !== 0 && dB !== 0 && Math.sign(dS) === Math.sign(dB) && (outer === 0 || outer === 7) && Math.abs(dS) > 2) {
     cost += tally(parts, 'Direct 5th/8ve', 15);
@@ -169,9 +205,17 @@ function transitionCost(prevSpec, prev, spec, cur, issues, parts) {
     const a = withOctave(entryFor(prevSpec, prev[v]).note, prev[v]);
     const b = withOctave(entryFor(spec, cur[v]).note, cur[v]);
     const iv = intervalName(a, b);
-    if (iv.quality.startsWith('A') || iv.quality.startsWith('d')) {
-      cost += tally(parts, 'Awkward interval', iv.quality.startsWith('A') ? 20 : 4);
-      if (iv.quality.startsWith('A')) issues?.push({ level: 'warn', text: `${VOICES[v]} moves by an augmented interval (${iv.short}).` });
+    const augmented = iv.quality.startsWith('A');
+    if (augmented || iv.quality.startsWith('d')) {
+      cost += tally(parts, 'Awkward interval', augmented ? 20 : 4);
+      if (augmented) issues?.push({ level: 'warn', text: `${VOICES[v]} moves by an augmented interval (${iv.short}).` });
+    }
+    if (augmented || iv.number > 8) continue; // reported above, or by the octave check
+    if (iv.number === 7) {
+      cost += tally(parts, 'Leaps', 8);
+      issues?.push({ level: 'warn', text: `${VOICES[v]} leaps a 7th (${iv.short}); avoid melodic 7ths.` });
+    } else if (iv.number > 3) {
+      issues?.push({ level: 'info', text: `${VOICES[v]} leaps ${iv.number === 8 ? 'an octave' : 'a ' + iv.simpleName} (${iv.short}); upper voices move most smoothly by step or by a 3rd at most.` });
     }
   }
   return cost;
