@@ -71,7 +71,8 @@ const defaults = () => ({
   settings: {
     names: 'english',
     autoRaise: false,
-    quickAdd: false,
+    quickAdd: true,
+    quickAddDefaultOn: true, // Quick add became the default in Nov 2026
     tempo: 72, // quarter notes per minute
     tab: 'score',
     show: Object.fromEntries(PARTS.map(([k]) => [k, true])),
@@ -91,6 +92,8 @@ function load() {
     const settings = { ...d.settings, ...saved.settings };
     settings.show = { ...d.settings.show, ...saved.settings?.show };
     settings.sound = { ...d.settings.sound, ...saved.settings?.sound };
+    // Switch Quick add on once for people who saved settings before it became the default.
+    if (!saved.settings?.quickAddDefaultOn) { settings.quickAdd = true; settings.quickAddDefaultOn = true; }
     const s = { ...d, ...saved, settings, score: { ...d.score, ...saved.score }, practice: { ...d.practice, ...saved.practice } };
     if (s.target?.type !== 'append' && !(s.target?.index < s.progression.length + (s.target?.type === 'insert' ? 1 : 0))) s.target = d.target;
     return s;
@@ -525,6 +528,7 @@ function renderControls() {
 
   for (const b of $('duration-choice').querySelectorAll('button')) if (!b.innerHTML) b.innerHTML = noteIcon(b.dataset.value);
   $('rest-toggle').setAttribute('aria-pressed', String(state.rest));
+  $('rest-toggle').textContent = t.type === 'edit' ? 'Rest' : 'Add rest';
 
   // Editing / inserting
   const banner = $('edit-banner');
@@ -552,10 +556,9 @@ function renderControls() {
   if (state.score.pickup >= bar) state.score.pickup = 0;
   $('pickup').innerHTML = `<option value="0">None</option>${pickups.map((p) => `<option value="${p}"${p === state.score.pickup ? ' selected' : ''}>${ticksLabel(p)}</option>`).join('')}`;
   const firstKey = state.progression[0] ? entryKey(state.progression[0]) : key;
-  $('score-key').innerHTML = `<option value="auto">From the first chord (${esc(keyName(firstKey, sys()))})</option>`
+  $('score-key').innerHTML = `<option value="auto">From chord 1 (${esc(keyName(firstKey, sys()))})</option>`
     + KEY_SIGNATURES.map(([spec, label]) => `<option value="${spec}"${spec === state.score.keySig ? ' selected' : ''}>${esc(label)} (${esc(noteName(parseNote(spec), sys()))} major)</option>`).join('');
   $('score-key').value = state.score.keySig;
-  $('score-summary').textContent = `${sig.num}/${sig.den}${state.score.pickup ? `, pickup ${ticksLabel(state.score.pickup)}` : ''}`;
 
   renderParts();
   renderPlayer();
@@ -1323,6 +1326,19 @@ function commit() {
   if (document.activeElement === $('figures')) $('figures').blur();
 }
 
+/**
+ * One press adds a rest in the chosen note value. While editing a chord, it switches
+ * that chord between a rest and a chord instead.
+ */
+function addRest() {
+  if (state.target.type === 'edit') { setInput({ rest: !state.rest }); return; }
+  const keep = { figures: state.figures, bassAcc: state.bassAcc, bassOctave: state.bassOctave };
+  const appending = state.target.type === 'append';
+  state.rest = true;
+  commit();
+  if (appending) { Object.assign(state, keep); update(); }
+}
+
 function cancelEdit() {
   backToAppend();
   update();
@@ -1351,7 +1367,7 @@ function bind() {
   $('key-tonic').addEventListener('change', (e) => setInput({ tonic: e.target.value }));
   onButton('key-mode', (b) => setInput({ mode: b.dataset.value, tonic: closestTonic(b.dataset.value, state.tonic) }));
   $('new-keysig').addEventListener('change', (e) => setInput({ newKeySig: e.target.checked }));
-  onButton('bass-letters', (b) => setInput({ bassLetter: Number(b.dataset.letter) }));
+  onButton('bass-letters', (b) => setInput({ bassLetter: Number(b.dataset.letter), rest: false }));
   onButton('bass-acc', (b) => setInput({ bassAcc: b.dataset.value === 'key' ? 'key' : Number(b.dataset.value) }));
   onButton('fig-keypad', (b) => {
     if (b.dataset.mod) {
@@ -1384,7 +1400,7 @@ function bind() {
   });
   $('clear-figures').addEventListener('click', () => setInput({ figures: '' }));
   onButton('duration-choice', (b) => setInput({ duration: b.dataset.value }));
-  $('rest-toggle').addEventListener('click', () => setInput({ rest: !state.rest }));
+  $('rest-toggle').addEventListener('click', addRest);
 
   $('add-chord').addEventListener('click', commit);
 
@@ -1578,6 +1594,7 @@ function bind() {
       });
       return;
     }
+    if (e.key.toLowerCase() === 'r') { e.preventDefault(); addRest(); return; }
     // A digit or # starts typing figures for the current bass.
     if (/^[1-9#]$/.test(e.key) && !state.rest) { $('figures').focus(); return; }
     const i = 'cdefgab'.indexOf(e.key.toLowerCase());
