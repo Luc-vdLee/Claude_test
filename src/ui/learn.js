@@ -89,7 +89,8 @@ export function initLearn({ root, names, soundOn, openInDecoder, startRealizatio
     const voiced = voiceProgression([d])[0];
     sound.stop();
     sound.setVoices([true, true, true, true]);
-    voiced.forEach((v, i) => setTimeout(() => sound.playChord(v.midis, 1.1), i * 1000));
+    // The first chord starts inside the button press (iPhone and iPad need that), the rest follow.
+    voiced.forEach((v, i) => (i === 0 ? sound.playChord(v.midis, 1.1) : setTimeout(() => sound.playChord(v.midis, 1.1), i * 1000)));
   }
 
   // ------------------------------------------------------------ views
