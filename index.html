@@ -39,20 +39,6 @@
             <button id="autoplay-toggle" class="toggle" aria-pressed="true" title="Hear each chord as you add or change it"><svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span class="bl">Hear each chord</span></button>
             <span class="tempo" id="tempo-label">72 bpm</span>
           </div>
-          <details class="score-settings" id="score-settings" data-part="scoreSettings">
-            <summary title="Score settings: time signature, pickup, key signature"><span class="bl">Score settings: </span><span id="score-summary"></span></summary>
-            <div class="score-grid">
-              <label class="field-inline">
-                <span class="label">Pickup (upbeat)</span>
-                <select id="pickup"></select>
-              </label>
-              <label class="field-inline">
-                <span class="label">Key signature at the start</span>
-                <select id="score-key"></select>
-              </label>
-            </div>
-            <p class="hint">Tap a chord in the score or in the list below to edit it.</p>
-          </details>
           <div class="panel-head">
             <h2>Score</h2>
             <div class="row tight">
@@ -95,7 +81,7 @@
           <div class="field">
             <div class="row tight timesig-row">
               <label class="field-inline">
-                <span class="label">Time signature</span>
+                <span class="label">Time</span>
                 <select id="time-sig">
                   <option value="2/4">2/4</option>
                   <option value="3/4">3/4</option>
@@ -120,6 +106,14 @@
               </div>
             </div>
           </div>
+          <label class="field field-pickup" data-part="scoreSettings">
+            <span class="label">Pickup</span>
+            <select id="pickup" title="Pickup (upbeat) before the first full bar"></select>
+          </label>
+          <label class="field field-scorekey" data-part="scoreSettings">
+            <span class="label">Opening key signature</span>
+            <select id="score-key"></select>
+          </label>
           <label class="field field-tempo" data-part="sound">
             <span class="label">Tempo <span id="tempo-val" class="tempo-val"></span></span>
             <input id="tempo" type="range" min="40" max="160" step="2" aria-label="Tempo in quarter notes per minute">
@@ -148,6 +142,17 @@
               </div>
             </div>
           </div>
+          <div class="field" data-part="noteValues">
+            <span class="label">Note value</span>
+            <div class="row">
+              <div class="segmented" id="duration-choice" role="radiogroup" aria-label="Note value">
+                <button data-value="8" role="radio" title="Eighth note"></button>
+                <button data-value="q" role="radio" title="Quarter note"></button>
+                <button data-value="h" role="radio" title="Half note"></button>
+              </div>
+              <button id="rest-toggle" class="toggle" aria-pressed="false" title="Add a rest in all voices, in the note value you picked">Add rest</button>
+            </div>
+          </div>
         </div>
 
         <div class="strip-col col-fig">
@@ -165,22 +170,14 @@
               <button id="suggest-figures" class="ghost" data-part="figureButtons" title="Suggest figures with the Rule of the Octave">Suggest</button>
             </div>
             <div class="field-error" id="fig-error" aria-live="polite"></div>
-            <label class="check quick-add" data-part="figureButtons">
-              <input type="checkbox" id="quick-add">
-              <span>Quick add: tapping a figure adds the chord straight away</span>
-            </label>
           </div>
-
-          <div class="field" data-part="noteValues">
-            <span class="label">Note value</span>
-            <div class="row">
-              <div class="segmented" id="duration-choice" role="radiogroup" aria-label="Note value">
-                <button data-value="8" role="radio" title="Eighth note"></button>
-                <button data-value="q" role="radio" title="Quarter note"></button>
-                <button data-value="h" role="radio" title="Half note"></button>
-              </div>
-              <button id="rest-toggle" class="toggle" aria-pressed="false" title="A rest in all voices instead of a chord">Rest</button>
-            </div>
+          <div class="actions">
+            <button id="add-chord" class="primary"><span id="add-label">Add to score</span> <kbd>Enter</kbd></button>
+            <button id="cancel-edit" class="ghost" hidden>Cancel</button>
+            <label class="check quick-add" data-part="figureButtons" title="Quick add: tapping a figure adds the chord straight away">
+              <input type="checkbox" id="quick-add">
+              <span>Quick add<span class="qa-long">: a figure tap adds the chord</span></span>
+            </label>
           </div>
         </div>
       </section>
@@ -198,10 +195,6 @@
           </div>
           <div class="strip-eyebrow" id="strip-eyebrow">Current chord</div>
           <div id="result" class="result" aria-live="polite"></div>
-          <div class="actions">
-            <button id="add-chord" class="primary"><span id="add-label">Add to score</span> <kbd>Enter</kbd></button>
-            <button id="cancel-edit" class="ghost" hidden>Cancel</button>
-          </div>
         </div>
       </section>
 
