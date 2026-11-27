@@ -74,59 +74,6 @@
     </div>
 
     <div class="pane pane-input">
-      <section class="panel card card-global" aria-label="Key, time and tempo">
-        <div class="card-title">Piece</div>
-        <div class="global-grid">
-          <div class="field field-key">
-            <span class="label">Key</span>
-            <div class="row">
-              <select id="key-tonic" aria-label="Key tonic"></select>
-              <div class="segmented" id="key-mode" role="radiogroup" aria-label="Mode">
-                <button data-value="major" role="radio">Major</button>
-                <button data-value="minor" role="radio">Minor</button>
-              </div>
-            </div>
-            <label class="check keysig-row" id="keysig-row" hidden>
-              <input type="checkbox" id="new-keysig">
-              <span>The key changes here: print a new key signature in the score</span>
-            </label>
-          </div>
-
-          <div class="field">
-            <div class="row tight timesig-row">
-              <label class="field-inline">
-                <span class="label">Time signature</span>
-                <select id="time-sig">
-                  <option value="2/4">2/4</option>
-                  <option value="3/4">3/4</option>
-                  <option value="4/4">4/4</option>
-                  <option value="2/2">2/2 (alla breve)</option>
-                  <option value="3/8">3/8</option>
-                  <option value="6/8">6/8</option>
-                  <option value="custom">Custom…</option>
-                </select>
-              </label>
-              <div class="field-inline" id="custom-time" hidden>
-                <span class="label">Custom</span>
-                <div class="row tight">
-                  <input id="time-num" type="number" min="1" max="16" aria-label="Beats per bar">
-                  <span>/</span>
-                  <select id="time-den" aria-label="Beat unit">
-                    <option value="2">2</option>
-                    <option value="4">4</option>
-                    <option value="8">8</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-          <label class="field field-tempo" data-part="sound">
-            <span class="label">Tempo <span id="tempo-val" class="tempo-val"></span></span>
-            <input id="tempo" type="range" min="40" max="160" step="2" aria-label="Tempo in quarter notes per minute">
-          </label>
-        </div>
-      </section>
-
       <section class="panel input-panel strip card-chord" aria-label="Current chord">
         <div class="card-title">Chord</div>
         <div class="strip-col col-bass">
@@ -184,9 +131,7 @@
           </div>
         </div>
       </section>
-    </div>
 
-    <div class="pane pane-panels">
       <section class="panel card card-result" aria-label="Current chord result">
         <div class="strip-col col-result">
           <div class="edit-banner" id="edit-banner" hidden>
@@ -202,6 +147,61 @@
             <button id="add-chord" class="primary"><span id="add-label">Add to score</span> <kbd>Enter</kbd></button>
             <button id="cancel-edit" class="ghost" hidden>Cancel</button>
           </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="pane pane-panels">
+      <section class="panel card card-global" aria-label="Key, time and tempo">
+        <div class="card-title">Piece</div>
+        <div class="global-grid">
+          <div class="field field-key">
+            <span class="label">Key</span>
+            <div class="row">
+              <select id="key-tonic" aria-label="Key tonic"></select>
+              <div class="segmented" id="key-mode" role="radiogroup" aria-label="Mode">
+                <button data-value="major" role="radio">Major</button>
+                <button data-value="minor" role="radio">Minor</button>
+              </div>
+            </div>
+            <label class="check keysig-row" id="keysig-row" hidden>
+              <input type="checkbox" id="new-keysig">
+              <span>The key changes here: print a new key signature in the score</span>
+            </label>
+          </div>
+
+          <div class="field">
+            <div class="row tight timesig-row">
+              <label class="field-inline">
+                <span class="label">Time signature</span>
+                <select id="time-sig">
+                  <option value="2/4">2/4</option>
+                  <option value="3/4">3/4</option>
+                  <option value="4/4">4/4</option>
+                  <option value="2/2">2/2 (alla breve)</option>
+                  <option value="3/8">3/8</option>
+                  <option value="6/8">6/8</option>
+                  <option value="custom">Custom…</option>
+                </select>
+              </label>
+              <div class="field-inline" id="custom-time" hidden>
+                <span class="label">Custom</span>
+                <div class="row tight">
+                  <input id="time-num" type="number" min="1" max="16" aria-label="Beats per bar">
+                  <span>/</span>
+                  <select id="time-den" aria-label="Beat unit">
+                    <option value="2">2</option>
+                    <option value="4">4</option>
+                    <option value="8">8</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          <label class="field field-tempo" data-part="sound">
+            <span class="label">Tempo <span id="tempo-val" class="tempo-val"></span></span>
+            <input id="tempo" type="range" min="40" max="160" step="2" aria-label="Tempo in quarter notes per minute">
+          </label>
         </div>
       </section>
 

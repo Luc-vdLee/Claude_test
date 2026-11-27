@@ -212,7 +212,8 @@ input.invalid, textarea.invalid { border-color: var(--bad) !important; box-shado
     display: grid; gap: 14px; align-items: stretch;
     grid-template-columns: clamp(330px, 26vw, 430px) minmax(0, 1fr) clamp(310px, 28vw, 480px);
   }
-  /* Left: Piece + Chord cards. Middle: score + keyboard. Right: result + tabs. */
+  /* Left: one chord from top to bottom (Chord card, then the result with Add to score).
+     Middle: score + keyboard. Right: Piece card (set once) + tabs. */
   .pane-input { order: 1; }
   .pane-visual { order: 2; }
   .pane-panels { order: 3; }
@@ -265,7 +266,7 @@ input.invalid, textarea.invalid { border-color: var(--bad) !important; box-shado
   .keyboard-panel .keyboard-wrap { margin-top: 0; }
   .keyboard { max-height: 110px; }
 
-  /* Middle column: compact cards, the Add button always in reach */
+  /* Left and right columns: compact cards, the Add button always in reach */
   .card-global { padding: 8px 12px 10px; }
   .card-global .card-title { margin-bottom: 4px; }
   .global-grid { gap: 8px 16px; }
@@ -284,6 +285,9 @@ input.invalid, textarea.invalid { border-color: var(--bad) !important; box-shado
   .fig-keypad .mod { font-size: 1.15rem; }
   .col-fig .quick-add { margin-top: 4px; font-size: .82rem; }
   .card-result { padding: 10px 14px; }
+  /* Add to score sits right under the Chord card; on a short screen it stays pinned
+     at the bottom of the column so the button is always in reach. */
+  .pane-input .card-result { position: sticky; bottom: 0; z-index: 2; background: var(--panel); }
   .col-result { gap: 4px; }
   .result .chord-symbol { font-size: 1.8rem; }
   .result .numeral { font-size: 1.45rem; }
